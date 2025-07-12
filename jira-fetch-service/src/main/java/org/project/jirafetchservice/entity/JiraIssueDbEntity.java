@@ -7,14 +7,11 @@ import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 @Table("jira_issue")
-public class JiraIssueDbEntity implements Persistable<String> {
+public class JiraIssueDbEntity  {
 
     @Id
     private String id;
     
-    @Transient
-    private boolean newEntity = true;
-
     @Column("issue_key")
     private String issueKey;
 
