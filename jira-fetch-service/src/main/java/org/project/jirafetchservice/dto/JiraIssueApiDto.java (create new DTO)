@@ -1,0 +1,210 @@
+public class JiraIssueApiDto {
+    private String issueKey;
+    private String summary;
+    private String issueType;
+    private String status;
+    private String priority;
+    private String resolution;
+    private String assignee;
+    private String assigneeEmail;
+    private String reporter;
+    private String reporterEmail;
+    private String created;
+    private String updated;
+    private String resolved;
+    private int timeSpentSeconds;
+    private String organization;
+    private String classification;
+    private String entity;
+    private String issueQuality;
+    private String medium;
+    private int ttsDays;
+    private String site;
+    private String month;
+    private int quotaPerProject;
+
+    // Getters and Setters
+    public String getIssueKey() {
+        return issueKey;
+    }
+
+    public void setIssueKey(String issueKey) {
+        this.issueKey = issueKey;
+    }
+
+    public String getSummary() {
+        return summary;
+    }
+
+    public void setSummary(String summary) {
+        this.summary = summary;
+    }
+
+    public String getIssueType() {
+        return issueType;
+    }
+
+    public void setIssueType(String issueType) {
+        this.issueType = issueType;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getPriority() {
+        return priority;
+    }
+
+    public void setPriority(String priority) {
+        this.priority = priority;
+    }
+
+    public String getResolution() {
+        return resolution;
+    }
+
+    public void setResolution(String resolution) {
+        this.resolution = resolution;
+    }
+
+    public String getAssignee() {
+        return assignee;
+    }
+
+    public void setAssignee(String assignee) {
+        this.assignee = assignee;
+    }
+
+    public String getAssigneeEmail() {
+        return assigneeEmail;
+    }
+
+    public void setAssigneeEmail(String assigneeEmail) {
+        this.assigneeEmail = assigneeEmail;
+    }
+
+    public String getReporter() {
+        return reporter;
+    }
+
+    public void setReporter(String reporter) {
+        this.reporter = reporter;
+    }
+
+    public String getReporterEmail() {
+        return reporterEmail;
+    }
+
+    public void setReporterEmail(String reporterEmail) {
+        this.reporterEmail = reporterEmail;
+    }
+
+    public String getCreated() {
+        return created;
+    }
+
+    public void setCreated(String created) {
+        this.created = created;
+    }
+
+    public String getUpdated() {
+        return updated;
+    }
+
+    public void setUpdated(String updated) {
+        this.updated = updated;
+    }
+
+    public String getResolved() {
+        return resolved;
+    }
+
+    public void setResolved(String resolved) {
+        this.resolved = resolved;
+    }
+
+    public int getTimeSpentSeconds() {
+        return timeSpentSeconds;
+    }
+
+    public void setTimeSpentSeconds(int timeSpentSeconds) {
+        this.timeSpentSeconds = timeSpentSeconds;
+    }
+
+    public String getOrganization() {
+        return organization;
+    }
+
+    public void setOrganization(String organization) {
+        this.organization = organization;
+    }
+
+    public String getClassification() {
+        return classification;
+    }
+
+    public void setClassification(String classification) {
+        this.classification = classification;
+    }
+
+    public String getEntity() {
+        return entity;
+    }
+
+    public void setEntity(String entity) {
+        this.entity = entity;
+    }
+
+    public String getIssueQuality() {
+        return issueQuality;
+    }
+
+    public void setIssueQuality(String issueQuality) {
+        this.issueQuality = issueQuality;
+    }
+
+    public String getMedium() {
+        return medium;
+    }
+
+    public void setMedium(String medium) {
+        this.medium = medium;
+    }
+
+    public int getTtsDays() {
+        return ttsDays;
+    }
+
+    public void setTtsDays(int ttsDays) {
+        this.ttsDays = ttsDays;
+    }
+
+    public String getSite() {
+        return site;
+    }
+
+    public void setSite(String site) {
+        this.site = site;
+    }
+
+    public String getMonth() {
+        return month;
+    }
+
+    public void setMonth(String month) {
+        this.month = month;
+    }
+
+    public int getQuotaPerProject() {
+        return quotaPerProject;
+    }
+
+    public void setQuotaPerProject(int quotaPerProject) {
+        this.quotaPerProject = quotaPerProject;
+    }
+}
