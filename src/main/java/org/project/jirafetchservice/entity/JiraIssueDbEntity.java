@@ -12,11 +12,11 @@ public class JiraIssueDbEntity implements Persistable<String> {
     @Id
     private String id;
     
-    @Transient
-    private boolean newEntity = true;
-
     @Column("issue_key")
     private String issueKey;
+
+    @Transient
+    private boolean newEntity = true; 
 
     @Column("project_key")
     private String projectKey;
