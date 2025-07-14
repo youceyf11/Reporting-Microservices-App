@@ -50,20 +50,69 @@ public interface JiraMapper {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXX");
             return OffsetDateTime.parse(dateString, formatter).toLocalDateTime();
         } catch (DateTimeParseException e) {
-            throw new RuntimeException("Impossible de parser la date: " + dateString, e);
+            System.err.println("Error parsing date: " + dateString + " - " + e.getMessage());
+            return null;
         }
+    }
+
+    @Named("extractProjectKey")
+    default String extractProjectKey(String issueKey) {
+        if (issueKey == null || !issueKey.contains("-")) {
+            return null;
+        }
+        return issueKey.split("-")[0];
+    }
+
+    @Named("formatDateForDb")
+    default String formatDateForDb(LocalDateTime dateTime) {
+        if (dateTime == null) {
+            return null;
+        }
+        return dateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
     }
 
     // API → DTO complet
     JiraIssueDto toJiraIssueDto(JiraIssueApiResponse apiResponse);
 
     // API → Entité DB
+    @Mapping(source = "key", target = "id")
+    @Mapping(source = "key", target = "issueKey")
+    @Mapping(source = "key", target = "projectKey", qualifiedByName = "extractProjectKey")
+    @Mapping(source = "fields.summary", target = "summary")
+    @Mapping(source = "fields.issuetype.name", target = "issueType")
+    @Mapping(source = "fields.status.name", target = "status")
+    @Mapping(source = "fields.priority.name", target = "priority")
+    @Mapping(source = "fields.resolution.name", target = "resolution")
+    @Mapping(source = "fields.assignee.displayName", target = "assignee")
+    @Mapping(source = "fields.assignee.emailAddress", target = "assigneeEmail")
+    @Mapping(source = "fields.reporter.displayName", target = "reporter")
+    @Mapping(source = "fields.reporter.emailAddress", target = "reporterEmail")
+    @Mapping(source = "fields.organization", target = "organization")
+    @Mapping(source = "fields.created", target = "created")
+    @Mapping(source = "fields.updated", target = "updated")
+    @Mapping(source = "fields.resolved", target = "resolved")
+    @Mapping(source = "fields.timeSpentSeconds", target = "timeSpentSeconds")
+    @Mapping(source = "fields.classification", target = "classification")
+    @Mapping(source = "fields.entity", target = "entity")
+    @Mapping(source = "fields.issueQuality", target = "issueQuality")
+    @Mapping(source = "fields.medium", target = "medium")
+    @Mapping(source = "fields.ttsDays", target = "ttsDays")
+    @Mapping(source = "fields.site", target = "site")
+    @Mapping(source = "fields.month", target = "issueMonth")
+    @Mapping(source = "fields.quotaPerProject", target = "quotaPerProject")
+    @Mapping(source = "self", target = "selfUrl")
     JiraIssueDbEntity toDbEntityFromApi(JiraIssueApiResponse apiResponse);
 
     // Entité DB → DTO simple
     IssueSimpleDto toSimpleDtoFromDb(JiraIssueDbEntity dbEntity);
 
     // DTO simple → Entité DB
+    @Mapping(source = "issueKey", target = "id")
+    @Mapping(source = "issueKey", target = "issueKey")
+    @Mapping(source = "issueKey", target = "projectKey", qualifiedByName = "extractProjectKey")
+    @Mapping(source = "created", target = "created", qualifiedByName = "formatDateForDb")
+    @Mapping(source = "updated", target = "updated", qualifiedByName = "formatDateForDb")
+    @Mapping(source = "resolved", target = "resolved", qualifiedByName = "formatDateForDb")
     JiraIssueDbEntity toDbEntityFromSimpleDto(IssueSimpleDto dto);
 
     // Méthodes pour les listes

@@ -7,13 +7,16 @@ import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 @Table("jira_issue")
-public class JiraIssueDbEntity  {
+public class JiraIssueDbEntity implements Persistable<String> {
 
     @Id
     private String id;
     
     @Column("issue_key")
     private String issueKey;
+
+    @Transient
+    private boolean newEntity = true; 
 
     @Column("project_key")
     private String projectKey;
@@ -73,7 +76,7 @@ public class JiraIssueDbEntity  {
     @Column("quota_per_project")
     private String quotaPerProject;
 
-    // Implement Persistable interface
+    // Implement Persistable Integererface
     @Override
     public String getId() {
         return id;

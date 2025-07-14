@@ -9,7 +9,7 @@ import reactor.core.publisher.Mono;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 /**
- * Client for interacting with the Jira REST API.
+ * Client for Integereracting with the Jira REST API.
  * This client provides methods to fetch issues and search for issues using JQL.
  */
 @Component //indique à Spring que la classe annotée doit être détectée automatiquement et enregistrée comme un bean dans le contexte d’application

@@ -27,7 +27,7 @@ public class JiraIssueController {
         this.jiraIssueService = jiraIssueService;
     }
 
-    // ================== ENDPOINTS ISSUES ==================
+    // ================== ENDPOIntegerS ISSUES ==================
 
     @GetMapping("/issues/{issueKey}")
     public Mono<ResponseEntity<JiraIssueApiResponse>> getIssue(
@@ -43,7 +43,7 @@ public class JiraIssueController {
         return jiraIssueService.getProjectKeyFromIssue(issueKey);
     }
 
-    // ================== ENDPOINTS PROJETS ==================
+    // ================== ENDPOIntegerS PROJETS ==================
 
     @GetMapping("/projects/local")
     public Flux<String> getAllLocalProjectKeys() {
@@ -53,17 +53,17 @@ public class JiraIssueController {
     @GetMapping("/projects/{projectKey}/issues")
     public Flux<JiraIssueApiResponse> getProjectIssues(
             @PathVariable @NotBlank String projectKey,
-            @RequestParam(defaultValue = "50") @Positive @Max(100) int limit) {
+            @RequestParam(defaultValue = "50") @Positive @Max(100) Integer limit) {
         return jiraIssueService.getProjectIssues(projectKey)
                 .take(limit);
     }
 
-    // ================== ENDPOINTS RECHERCHE ==================
+    // ================== ENDPOIntegerS RECHERCHE ==================
 
     @GetMapping("/search")
     public Flux<JiraIssueApiResponse> searchIssues(
             @RequestParam @NotBlank String jql,
-            @RequestParam(defaultValue = "50") @Positive @Max(100) int limit) {
+            @RequestParam(defaultValue = "50") @Positive @Max(100) Integer limit) {
         return jiraIssueService.searchIssues(jql)
                 .take(limit);
     }
@@ -74,7 +74,7 @@ public class JiraIssueController {
         return jiraIssueService.getIssuesAssignedTo(email);
     }
 
-    // ================== ENDPOINTS SYNCHRONISATION ==================
+    // ================== ENDPOIntegerS SYNCHRONISATION ==================
 
     @PostMapping("/issues/{issueKey}/sync")
     public Mono<ResponseEntity<IssueSimpleDto>> syncIssue(
@@ -87,7 +87,7 @@ public class JiraIssueController {
     @PostMapping("/projects/{projectKey}/sync")
     public Flux<IssueSimpleDto> syncProject(
             @PathVariable @NotBlank String projectKey,
-            @RequestParam(defaultValue = "50") @Positive @Max(100) int batchSize) {
+            @RequestParam(defaultValue = "50") @Positive @Max(100) Integer batchSize) {
         return jiraIssueService.synchroniserProjetAvecJira(projectKey, batchSize);
     }
 
@@ -97,7 +97,7 @@ public class JiraIssueController {
         return jiraIssueService.synchroniserSearchAvecJira(jql);
     }
 
-    // ================== ENDPOINTS BASE LOCALE ==================
+    // ================== ENDPOIntegerS BASE LOCALE ==================
 
     @GetMapping("/local/issues/{issueKey}")
     public Mono<ResponseEntity<IssueSimpleDto>> getLocalIssue(
@@ -107,7 +107,7 @@ public class JiraIssueController {
                 .onErrorReturn(ResponseEntity.notFound().build());
     }
 
-    // ================== ENDPOINTS UTILITAIRES ==================
+    // ================== ENDPOIntegerS UTILITAIRES ==================
 
     @GetMapping("/health")
     public Mono<ResponseEntity<String>> health() {

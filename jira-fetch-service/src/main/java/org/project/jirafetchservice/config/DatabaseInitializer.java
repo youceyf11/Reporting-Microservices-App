@@ -33,7 +33,7 @@ public class DatabaseInitializer implements CommandLineRunner {
                 created VARCHAR(255),
                 updated VARCHAR(255),
                 resolved VARCHAR(255),
-                time_spent_seconds BIGINT,
+                time_spent_seconds BIGInteger,
                 organization VARCHAR(255),
                 classification VARCHAR(255),
                 entity VARCHAR(255),

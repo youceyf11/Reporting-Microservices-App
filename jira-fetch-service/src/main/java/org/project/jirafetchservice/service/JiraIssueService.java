@@ -14,6 +14,7 @@ import reactor.core.publisher.Mono;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class JiraIssueService {
@@ -38,18 +39,15 @@ public class JiraIssueService {
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Issue non trouvée : " + issueKey)));
     }
 
-
     public Flux<JiraIssueApiResponse> getProjectIssues(String projectKey) {
         return jiraWebClient.searchProjectIssues(projectKey)
                 .switchIfEmpty(Flux.error(new IllegalArgumentException("Aucune issue pour le projet : " + projectKey)));
     }
 
-
     public Flux<JiraIssueApiResponse> getIssuesAssignedTo(String assigneeEmail) {
         String jql = "assignee = '" + assigneeEmail + "'";
         return searchIssues(jql);
     }
-
 
     public Flux<JiraIssueApiResponse> searchIssues(String jql) {
         return jiraWebClient.searchIssues(jql)
@@ -57,20 +55,6 @@ public class JiraIssueService {
     }
 
     // ================== MÉTHODES DE SYNCHRONISATION OPTIMISÉES ==================
-
-    /* public Mono<IssueSimpleDto> synchroniserIssueAvecJira(String issueKey) {
-        return jiraIssueRepository.findByIssueKey(issueKey)
-                .next()
-                .flatMap(existingEntity -> {
-                    // Vérifie si l'issue a été modifiée récemment dans Jira
-                    if (existingEntity.getUpdated() != null &&
-                        isRecentlyUpdatedInJira(existingEntity.getUpdated())) {
-                        return Mono.just(jiraMapper.toSimpleDtoFromDb(existingEntity));
-                    }
-                    return synchroniserDepuisJira(issueKey);
-                })
-                .switchIfEmpty(synchroniserDepuisJira(issueKey));
-    } */
 
     public Mono<IssueSimpleDto> synchroniserIssueAvecJira(String issueKey) {
         return jiraIssueRepository.findByIssueKey(issueKey)
@@ -84,7 +68,7 @@ public class JiraIssueService {
                 })
                 .switchIfEmpty(synchroniserDepuisJira(issueKey))
                 .doOnError(error -> {
-                    System.err.println(" Erreur sync " + issueKey + ": " + error.getMessage());
+                    System.err.println("Erreur sync " + issueKey + ": " + error.getMessage());
                     error.printStackTrace();
                 })
                 .onErrorResume(error -> {
@@ -110,34 +94,54 @@ public class JiraIssueService {
                     JiraIssueDbEntity entity = jiraMapper.toDbEntityFromSimpleDto(issueDto);
                     return jiraIssueRepository.save(entity)
                             .map(savedEntity -> issueDto);
-                });
+                })
+                .doOnError(error -> System.err.println("Erreur lors de la synchronisation depuis Jira: " + error.getMessage()));
     }
 
-
-    public Flux<IssueSimpleDto> synchroniserProjetAvecJira(String projectKey, int batchSize) {
+    public Flux<IssueSimpleDto> synchroniserProjetAvecJira(String projectKey, Integer batchSize) {
+        AtomicInteger processedCount = new AtomicInteger(0);
+        
         return jiraWebClient.searchProjectIssues(projectKey)
+                .doOnNext(issue -> System.out.println("Traitement de l'issue: " + issue.getKey()))
+                .map(jiraMapper::toSimpleDtoFromApi)
                 .buffer(batchSize)
-                .flatMap(issueBatch -> {
-                    List<IssueSimpleDto> issueDtos = issueBatch.stream()
-                            .map(jiraMapper::toSimpleDtoFromApi)
-                            .toList();
-
-                    return filtrerIssuesObsoletes(issueDtos)
+                .concatMap(issueBatch -> {
+                    System.out.println("Traitement d'un batch de " + issueBatch.size() + " issues");
+                    
+                    return filtrerIssuesObsoletes(issueBatch)
                             .collectList()
                             .flatMapMany(issuesToSync -> {
                                 if (issuesToSync.isEmpty()) {
+                                    System.out.println("Aucune issue à synchroniser dans ce batch");
                                     return Flux.empty();
                                 }
 
+                                System.out.println("Synchronisation de " + issuesToSync.size() + " issues");
                                 List<JiraIssueDbEntity> entities = issuesToSync.stream()
                                         .map(jiraMapper::toDbEntityFromSimpleDto)
                                         .toList();
 
                                 return jiraIssueRepository.saveAll(entities)
-                                        .map(jiraMapper::toSimpleDtoFromDb);
+                                        .map(jiraMapper::toSimpleDtoFromDb)
+                                        .doOnNext(saved -> {
+                                            Integer count = processedCount.incrementAndGet();
+                                            if (count % 10 == 0) {
+                                                System.out.println("Traité " + count + " issues");
+                                            }
+                                        });
+                            })
+                            .onErrorResume(error -> {
+                                System.err.println("Erreur lors du traitement du batch: " + error.getMessage());
+                                error.printStackTrace();
+                                return Flux.empty();
                             });
                 })
-                .switchIfEmpty(Flux.error(new IllegalArgumentException("Aucune issue pour le projet : " + projectKey)));
+                .doOnComplete(() -> System.out.println("Synchronisation terminée. Total traité: " + processedCount.get()))
+                .doOnError(error -> System.err.println("Erreur lors de la synchronisation du projet: " + error.getMessage()))
+                .onErrorResume(error -> {
+                    System.err.println("Erreur générale de synchronisation: " + error.getMessage());
+                    return Flux.empty();
+                });
     }
 
     public Flux<IssueSimpleDto> synchroniserSearchAvecJira(String jql) {
@@ -148,20 +152,28 @@ public class JiraIssueService {
                     JiraIssueDbEntity entity = jiraMapper.toDbEntityFromSimpleDto(issueDto);
                     return jiraIssueRepository.save(entity)
                             .map(savedEntity -> issueDto);
-                });
+                })
+                .doOnError(error -> System.err.println("Erreur lors de la synchronisation de recherche: " + error.getMessage()));
     }
 
     // Méthode utilitaire pour vérifier si une issue Jira est récente
     private boolean isRecentlyUpdatedInJira(String updatedStr) {
         try {
-            // Parse le format Jira : "2024-01-15T10:30:45.000+0000"
-            LocalDateTime updated = LocalDateTime.parse(
-                updatedStr.substring(0, 19),
-                DateTimeFormatter.ISO_LOCAL_DATE_TIME
-            );
+            LocalDateTime updated;
+            if (updatedStr.contains("T") && updatedStr.contains(":")) {
+                // Format ISO datetime
+                updated = LocalDateTime.parse(
+                    updatedStr.substring(0, 19),
+                    DateTimeFormatter.ISO_LOCAL_DATE_TIME
+                );
+            } else {
+                // Assume it's already parsed
+                updated = LocalDateTime.parse(updatedStr);
+            }
             return updated.isAfter(LocalDateTime.now().minusHours(1));
         } catch (Exception e) {
-            return false; // Si parsing échoue, considère comme obsolète
+            System.err.println("Erreur lors du parsing de la date: " + updatedStr + " - " + e.getMessage());
+            return false;
         }
     }
 
@@ -185,13 +197,19 @@ public class JiraIssueService {
                 });
     }
 
+    private String extractProjectKeyFromIssueKey(String issueKey) {
+        if (issueKey == null || !issueKey.contains("-")) {
+            return null;
+        }
+        return issueKey.split("-")[0];
+    }
 
     public Flux<String> getAllLocalProjectKeys() {
         return jiraIssueRepository.findByProjectKeyIsNotNull()
                 .map(JiraIssueDbEntity::getProjectKey)
                 .distinct()
                 .onErrorResume(error -> {
-                    System.err.println("Erreur lors de la récupération des projets locaux: " + error.getMessage());  // ✅ Un seul paramètre
+                    System.err.println("Erreur lors de la récupération des projets locaux: " + error.getMessage());
                     return Flux.empty();
                 });
     }

@@ -32,7 +32,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> handleRuntime(RuntimeException ex) {
         Map<String, String> error = new HashMap<>();
-        error.put("error", "Erreur interne");
+        error.put("error", "Erreur Integererne");
         error.put("message", "Service temporairement indisponible");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }

@@ -4,7 +4,7 @@ import java.util.List;
 
 public class JiraSearchResponse {
     private List<JiraIssueApiResponse> issues;
-    private int total;
+    private Integer total;
 
     public List<JiraIssueApiResponse> getIssues() {
         return issues;
@@ -14,11 +14,11 @@ public class JiraSearchResponse {
         this.issues = issues;
     }
 
-    public int getTotal() {
+    public Integer getTotal() {
         return total;
     }
 
-    public void setTotal(int total) {
+    public void setTotal(Integer total) {
         this.total = total;
     }
 }
