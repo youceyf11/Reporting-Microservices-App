@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  jira-fetch-service:
+    build:
+      context: ./jira-fetch-service
+      dockerfile: dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SERVER_PORT=8081
+      - SPRING_R2DBC_URL=r2dbc:h2:mem:///jira-db?options=DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+      - SPRING_R2DBC_USERNAME=sa
+      - SPRING_R2DBC_PASSWORD=
+      - JIRA_BASE_URL=https://youceyfouriniche.atlassian.net
+      - JIRA_USERNAME=Youssef.Ouriniche@emsi-edu.ma
+      - JIRA_API_TOKEN=ATATT3xFfGF0GJ_QHuX64CLqyd3v0iILlH-iik28r0HDZUJ2W5A-uw51MGftZ8-N_1WMvdIlv5X0st3E8kzWM4iR6vvE0G1Cs8xgqnKDDZBQygHPruo4yi-_kbldjp8WBS0UCYJrbJCsddv97ND_hD58sdBoz7LVytqD3Bp9F8H-Hm87WIkB0GM=F5AA1AAC
+
+  reporting-service:
+    build:
+      context: ./reporting-service
+      dockerfile: dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SERVER_PORT=8082
+      - SPRING_R2DBC_URL=r2dbc:h2:mem:///reporting-db?options=DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+      - SPRING_R2DBC_USERNAME=sa
+      - SPRING_R2DBC_PASSWORD=
+      - JIRA_FETCH_BASE_URL=http://jira-fetch-service:8081
+    depends_on:
+      - jira-fetch-service
