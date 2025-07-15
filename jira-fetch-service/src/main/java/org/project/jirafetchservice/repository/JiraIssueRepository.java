@@ -1,7 +1,6 @@
 package org.project.jirafetchservice.repository;
 
 import org.project.jirafetchservice.entity.JiraIssueDbEntity;
-import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.data.rest.core.annotation.RepositoryRestResource;
 import reactor.core.publisher.Flux;
@@ -10,7 +9,7 @@ import java.util.List;
 
 
 @RepositoryRestResource
-public interface JiraIssueRepository extends ReactiveCrudRepository<JiraIssueDbEntity, Long> {
+public interface JiraIssueRepository extends ReactiveCrudRepository<JiraIssueDbEntity, String> {
     Flux<JiraIssueDbEntity> findByStatus(String status);
     Flux<JiraIssueDbEntity> findByAssignee(String assignee);
     Flux<JiraIssueDbEntity> findByIssueKey(String issueKey);

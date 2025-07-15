@@ -2,6 +2,7 @@ package org.project.jirafetchservice.controller;
 
 import org.project.jirafetchservice.dto.IssueSimpleDto;
 import org.project.jirafetchservice.jiraApi.JiraIssueApiResponse;
+import org.project.jirafetchservice.mapper.JiraMapper;
 import org.project.jirafetchservice.service.JiraIssueService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -21,10 +22,12 @@ import jakarta.validation.constraints.Max;
 public class JiraIssueController {
 
     private final JiraIssueService jiraIssueService;
+    private final JiraMapper jiraMapper;
 
-    @Autowired
-    public JiraIssueController(JiraIssueService jiraIssueService) {
+    
+    public JiraIssueController(JiraIssueService jiraIssueService, JiraMapper jiraMapper) {
         this.jiraIssueService = jiraIssueService;
+        this.jiraMapper = jiraMapper;
     }
 
     // ================== ENDPOIntegerS ISSUES ==================
@@ -51,10 +54,11 @@ public class JiraIssueController {
     }
 
     @GetMapping("/projects/{projectKey}/issues")
-    public Flux<JiraIssueApiResponse> getProjectIssues(
+    public Flux<IssueSimpleDto> getProjectIssues(
             @PathVariable @NotBlank String projectKey,
             @RequestParam(defaultValue = "50") @Positive @Max(100) Integer limit) {
         return jiraIssueService.getProjectIssues(projectKey)
+                .map(jiraMapper::toSimpleDtoFromApi)
                 .take(limit);
     }
 

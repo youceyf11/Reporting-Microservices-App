@@ -6,7 +6,6 @@ import org.project.jirafetchservice.entity.JiraIssueDbEntity;
 import org.project.jirafetchservice.jiraApi.JiraIssueApiResponse;
 import org.project.jirafetchservice.mapper.JiraMapper;
 import org.project.jirafetchservice.repository.JiraIssueRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -23,7 +22,7 @@ public class JiraIssueService {
     private final JiraIssueRepository jiraIssueRepository;
     private final JiraMapper jiraMapper;
 
-    @Autowired
+    
     public JiraIssueService(JiraWebClient jiraWebClient,
                             JiraIssueRepository jiraIssueRepository,
                             JiraMapper jiraMapper) {
@@ -197,12 +196,6 @@ public class JiraIssueService {
                 });
     }
 
-    private String extractProjectKeyFromIssueKey(String issueKey) {
-        if (issueKey == null || !issueKey.contains("-")) {
-            return null;
-        }
-        return issueKey.split("-")[0];
-    }
 
     public Flux<String> getAllLocalProjectKeys() {
         return jiraIssueRepository.findByProjectKeyIsNotNull()

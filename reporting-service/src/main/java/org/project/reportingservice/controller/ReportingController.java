@@ -2,9 +2,7 @@ package org.project.reportingservice.controller;
 
 import org.project.reportingservice.dto.EmployeePerformanceDto;
 import org.project.reportingservice.dto.ReportingResultDto;
-import org.project.reportingservice.dto.IssueSimpleDto;
 import org.project.reportingservice.service.ReportingService;
-import org.project.reportingservice.utils.TimeUtils;
 import org.project.reportingservice.response.MonthlyStatsResponse;
 import org.project.reportingservice.response.HealthResponse;
 import org.springframework.http.ResponseEntity;
@@ -37,11 +35,15 @@ public class ReportingController {
     @GetMapping("/monthly")
     public Mono<ResponseEntity<ReportingResultDto>> getMonthlyReport(
             @RequestParam String projectKey) {
-        
         return reportingService.generateMonthlyReport(projectKey)
                 .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.notFound().build())
-                .onErrorReturn(ResponseEntity.internalServerError().build());
+                .defaultIfEmpty(ResponseEntity.ok(new ReportingResultDto("No data found", "", List.of())))
+                .onErrorResume(error -> {
+                    error.printStackTrace();
+                    // Return an empty ReportingResultDto with a message
+                    ReportingResultDto emptyResult = new ReportingResultDto("Error occurred", "", List.of());
+                    return Mono.just(ResponseEntity.ok(emptyResult));
+                });
     }
     
     /**
@@ -71,12 +73,16 @@ public class ReportingController {
     @GetMapping("/monthly/stats")
     public Mono<ResponseEntity<MonthlyStatsResponse>> getMonthlyStatistics(
             @RequestParam String projectKey) {
-        
         return reportingService.getMonthlyStatistics(projectKey)
                 .map(this::createStatsResponse)
                 .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.notFound().build())
-                .onErrorReturn(ResponseEntity.internalServerError().build());
+                .defaultIfEmpty(ResponseEntity.ok(new MonthlyStatsResponse(0.0, 0, 0.0)))
+                .onErrorResume(error -> {
+                    error.printStackTrace();
+                    // Return a default MonthlyStatsResponse with zeros
+                    MonthlyStatsResponse emptyStats = new MonthlyStatsResponse(0.0, 0, 0.0);
+                    return Mono.just(ResponseEntity.ok(emptyStats));
+                });
     }
     
     /**

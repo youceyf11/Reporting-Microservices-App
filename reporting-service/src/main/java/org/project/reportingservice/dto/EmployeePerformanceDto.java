@@ -2,8 +2,6 @@ package org.project.reportingservice.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.project.reportingservice.dto.EmployeePerformanceDto;
-import java.time.LocalDateTime;
-import java.util.List;
 
     /**
      * DTO représentant les performances d'un employé
