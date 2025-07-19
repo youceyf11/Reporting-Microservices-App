@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS jira_issue (
     created VARCHAR(255),
     updated VARCHAR(255),
     resolved VARCHAR(255),
-    time_spent_seconds BIGInteger,
+    time_spent_seconds BIGINT,
     organization VARCHAR(255),
     classification VARCHAR(255),
     entity VARCHAR(255),
@@ -26,7 +26,3 @@ CREATE TABLE IF NOT EXISTS jira_issue (
     issue_month VARCHAR(255),
     quota_per_project VARCHAR(255)
 );
-
-CREATE INDEX IF NOT EXISTS idx_jira_issue_project_key ON jira_issue(project_key);
-CREATE INDEX IF NOT EXISTS idx_jira_issue_status ON jira_issue(status);
-CREATE INDEX IF NOT EXISTS idx_jira_issue_assignee ON jira_issue(assignee);

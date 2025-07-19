@@ -1,7 +1,6 @@
 package org.project.reportingservice.dto;
 
 import lombok.*;
-import org.project.reportingservice.dto.IssueSimpleDto;
 
 import java.time.LocalDateTime;
 
@@ -23,7 +22,7 @@ public class IssueSimpleDto {
     private LocalDateTime created;   // Date création
     private LocalDateTime updated;   // Dernière mise à jour
     private LocalDateTime resolved;  // Date de résolution
-    private long timeSpentSeconds;   // en secondes
+    private Long timeSpentSeconds;   // en secondes
     private String classification;   // Catégorie du ticket
     private String entity;           // Département ou composant
     private String issueQuality;     // Mesure de qualité (ex. "Good")
@@ -38,23 +37,9 @@ public class IssueSimpleDto {
         this.summary = summary;
     }
 
-    public String getAssignee() {
-        return assignee;
-    }
-
     public boolean isResolved() {
         return resolved != null;
     }
 
-    public LocalDateTime getResolved() {
-        return resolved;
-    }
-    public long getTimeSpentSeconds() {
-        return timeSpentSeconds;
-    }
-    public LocalDateTime getCreated() {
-        return created;
-    }
-    
 
 }

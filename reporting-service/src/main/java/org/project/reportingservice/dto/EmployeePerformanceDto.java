@@ -1,14 +1,18 @@
 package org.project.reportingservice.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.project.reportingservice.dto.EmployeePerformanceDto;
+import lombok.Getter;
+import lombok.Setter;
 
-    /**
+/**
      * DTO représentant les performances d'un employé
      */
-    public class EmployeePerformanceDto {
+@Getter
+@Setter
+public class EmployeePerformanceDto {
 
-        @JsonProperty("employeeEmail")
+    // Getters et Setters
+    @JsonProperty("employeeEmail")
         private String employeeEmail;
 
         @JsonProperty("totalHoursWorked")
@@ -33,7 +37,7 @@ import org.project.reportingservice.dto.EmployeePerformanceDto;
         @JsonProperty("ranking")
         private Integer ranking;
 
-        // Constructeurs
+
         public EmployeePerformanceDto() {}
 
         public EmployeePerformanceDto(String employeeEmail, Double totalHoursWorked, 
@@ -48,70 +52,7 @@ import org.project.reportingservice.dto.EmployeePerformanceDto;
             this.expectedHoursThisMonth = expectedHoursThisMonth;
         }
 
-        // Getters et Setters
-        public String getEmployeeEmail() {
-            return employeeEmail;
-        }
-
-        public void setEmployeeEmail(String employeeEmail) {
-            this.employeeEmail = employeeEmail;
-        }
-
-        public Double getTotalHoursWorked() {
-            return totalHoursWorked;
-        }
-
-        public void setTotalHoursWorked(Double totalHoursWorked) {
-            this.totalHoursWorked = totalHoursWorked;
-        }
-
-        public Integer getTotalIssuesResolved() {
-            return totalIssuesResolved;
-        }
-
-        public void setTotalIssuesResolved(Integer totalIssuesResolved) {
-            this.totalIssuesResolved = totalIssuesResolved;
-        }
-
-        public Double getExpectedHoursThisMonth() {
-            return expectedHoursThisMonth;
-        }
-        public void setExpectedHoursThisMonth(Double expectedHoursThisMonth) {
-            this.expectedHoursThisMonth = expectedHoursThisMonth;
-        }
-        public Double getAverageResolutionTimeHours() {
-            return averageResolutionTimeHours;
-        }
-
-        public void setAverageResolutionTimeHours(Double averageResolutionTimeHours) {
-            this.averageResolutionTimeHours = averageResolutionTimeHours;
-        }
-
-        public Double getPerformancePercentage() {
-            return performancePercentage;
-        }
-
-        public void setPerformancePercentage(Double performancePercentage) {
-            this.performancePercentage = performancePercentage;
-        }
-
-        public String getPerformanceLevel() {
-            return performanceLevel;
-        }
-
-        public void setPerformanceLevel(String performanceLevel) {
-            this.performanceLevel = performanceLevel;
-        }
-
-        public Integer getRanking() {
-            return ranking;
-        }
-
-        public void setRanking(Integer ranking) {
-            this.ranking = ranking;
-        }
-
-        @Override
+    @Override
         public String toString() {
             return "EmployeePerformanceDto{" +
                     "employeeEmail='" + employeeEmail + '\'' +

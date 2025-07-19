@@ -22,7 +22,6 @@ public class ReportingService implements IReportingService {
     private final IJiraClient jiraClient;
     private final ITimeUtils timeUtils;
 
-    
     public ReportingService(IJiraClient jiraClient, ITimeUtils timeUtils) {
         this.jiraClient = jiraClient;
         this.timeUtils = timeUtils;
@@ -45,27 +44,110 @@ public class ReportingService implements IReportingService {
     @Override
     public Mono<List<EmployeePerformanceDto>> getTopActiveEmployees(String projectKey, Integer topN) {
         return generateMonthlyReport(projectKey)
-                .map(report -> report.getEmployeeReports().stream()
-                        .limit(topN)
-                        .toList());
+                .map(report -> {
+                    List<EmployeePerformanceDto> rankings = report.getEmployeeRankings() != null ? report.getEmployeeRankings() : List.of();
+                    return rankings.stream()
+                            .limit(topN != null ? topN : 0)
+                            .toList();
+                });
     }
 
-    @Override
+   /* @Override
     public Mono<Tuple2<Double, Integer>> getMonthlyStatistics(String projectKey) {
         return generateMonthlyReport(projectKey)
                 .map(report -> {
-                    double totalHours = report.getEmployeeReports().stream()
-                            .mapToDouble(EmployeePerformanceDto::getTotalHoursWorked)
+                    List<EmployeePerformanceDto> rankings = report.getEmployeeRankings() != null ? report.getEmployeeRankings() : List.of();
+                    double totalHours = rankings.stream()
+                            .mapToDouble(e -> e.getTotalHoursWorked() != null ? e.getTotalHoursWorked() : 0.0)
                             .sum();
-                    Integer employeeCount = report.getTotalEmployees();
+                    Integer employeeCount = report.getTotalEmployees() != null ? report.getTotalEmployees() : 0;
                     return reactor.util.function.Tuples.of(totalHours, employeeCount);
                 });
-    }
+    } */
+  /* @Override
+   public Mono<Tuple2<Double, Integer>> getMonthlyStatistics(String projectKey) {
+       return generateMonthlyReport(projectKey)
+               .map(report -> {
+                   try {
+                       List<EmployeePerformanceDto> rankings = report.getEmployeeRankings();
+
+                       // Vérification de null safety
+                       if (rankings == null || rankings.isEmpty()) {
+                           return reactor.util.function.Tuples.of(0.0, 0);
+                       }
+
+                       // Calcul cohérent basé sur les mêmes données
+                       double totalHours = rankings.stream()
+                               .mapToDouble(e -> e.getTotalHoursWorked() != null ? e.getTotalHoursWorked() : 0.0)
+                               .sum();
+
+                       int employeeCount = rankings.size(); // Utiliser la taille de la liste plutôt que report.getTotalEmployees()
+
+                       return reactor.util.function.Tuples.of(totalHours, employeeCount);
+
+                   } catch (Exception e) {
+                       System.err.println("[ReportingService] Erreur dans getMonthlyStatistics: " + e.getMessage());
+                       e.printStackTrace();
+                       return reactor.util.function.Tuples.of(0.0, 0);
+                   }
+               })
+               .onErrorReturn(reactor.util.function.Tuples.of(0.0, 0)); // Fallback en cas d'erreur
+   }*/
+   @Override
+   public Mono<Tuple2<Double, Integer>> getMonthlyStatistics(String projectKey) {
+       System.out.println("=== DEBUG SERVICE: Début getMonthlyStatistics pour projet: " + projectKey);
+
+       return generateMonthlyReport(projectKey)
+               .doOnNext(report -> {
+                   System.out.println("=== DEBUG SERVICE: Report généré, employeeRankings: " +
+                           (report.getEmployeeRankings() != null ? report.getEmployeeRankings().size() : "null"));
+               })
+               .map(report -> {
+                   try {
+                       System.out.println("=== DEBUG SERVICE: Dans map, début calcul");
+
+                       List<EmployeePerformanceDto> rankings = report.getEmployeeRankings();
+                       System.out.println("=== DEBUG SERVICE: Rankings récupérés: " + (rankings != null ? rankings.size() : "null"));
+
+                       if (rankings == null || rankings.isEmpty()) {
+                           System.out.println("=== DEBUG SERVICE: Rankings vide, retour (0.0, 0)");
+                           return reactor.util.function.Tuples.of(0.0, 0);
+                       }
+
+                       double totalHours = rankings.stream()
+                               .mapToDouble(e -> {
+                                   Double hours = e.getTotalHoursWorked();
+                                   System.out.println("=== DEBUG SERVICE: Employee hours: " + hours);
+                                   return hours != null ? hours : 0.0;
+                               })
+                               .sum();
+
+                       int employeeCount = rankings.size();
+
+                       System.out.println("=== DEBUG SERVICE: Calculs finaux - totalHours: " + totalHours +
+                               ", employeeCount: " + employeeCount);
+
+                       Tuple2<Double, Integer> result = reactor.util.function.Tuples.of(totalHours, employeeCount);
+                       System.out.println("=== DEBUG SERVICE: Tuple créé avec succès");
+
+                       return result;
+
+                   } catch (Exception e) {
+                       System.err.println("=== DEBUG SERVICE: EXCEPTION dans map: " + e.getMessage());
+                       e.printStackTrace();
+                       return reactor.util.function.Tuples.of(0.0, 0);
+                   }
+               })
+               .doOnError(error -> {
+                   System.err.println("=== DEBUG SERVICE: ERREUR dans getMonthlyStatistics: " + error.getMessage());
+                   error.printStackTrace();
+               });
+   }
 
     // --- Internal business logic methods ---
 
     private boolean isResolvedInCurrentMonth(IssueSimpleDto issue) {
-        return issue.isResolved() && timeUtils.isInCurrentMonth(issue.getResolved());
+        return issue != null && issue.isResolved() && timeUtils.isInCurrentMonth(issue.getResolved());
     }
 
     private Mono<EmployeePerformanceDto> processEmployeeGroup(Flux<IssueSimpleDto> groupedFlux) {
@@ -75,7 +157,7 @@ public class ReportingService implements IReportingService {
     }
 
     private EmployeePerformanceDto calculateEmployeeMetrics(List<IssueSimpleDto> issues) {
-        if (issues.isEmpty()) {
+        if (issues == null || issues.isEmpty()) {
             return new EmployeePerformanceDto(
                 "Unknown",
                 0.0,
@@ -87,16 +169,16 @@ public class ReportingService implements IReportingService {
             );
         }
 
-        String assignee = issues.get(0).getAssignee();
+        String assignee = issues.get(0).getAssignee() != null ? issues.get(0).getAssignee() : "Unknown";
 
         // Calcul du temps total travaillé (en heures)
         double totalHoursWorked = issues.stream()
-                .mapToDouble(issue -> issue.getTimeSpentSeconds() / 3600.0)
+                .mapToDouble(issue -> issue != null && issue.getTimeSpentSeconds() != null ? issue.getTimeSpentSeconds() / 3600.0 : 0.0)
                 .sum();
 
         // Calcul de la moyenne du temps de résolution
         double averageResolutionTimeHours = issues.stream()
-                .filter(issue -> issue.getCreated() != null && issue.getResolved() != null)
+                .filter(issue -> issue != null && issue.getCreated() != null && issue.getResolved() != null)
                 .mapToDouble(issue -> timeUtils.calculateHoursDifference(
                         issue.getCreated(), issue.getResolved()))
                 .average()
@@ -131,12 +213,14 @@ public class ReportingService implements IReportingService {
             return new ReportingResultDto(
                 timeUtils.getCurrentMonth(LocalDateTime.now()),
                 timeUtils.getCurrentYear(),
-                List.of() // or Collections.emptyList()
+                List.of()
             );
         }
         // Tri par heures travaillées (décroissant) pour le classement
         List<EmployeePerformanceDto> sortedReports = employeeReports.stream()
-                .sorted((e1, e2) -> Double.compare(e2.getTotalHoursWorked(), e1.getTotalHoursWorked()))
+                .sorted((e1, e2) -> Double.compare(
+                        e2.getTotalHoursWorked() != null ? e2.getTotalHoursWorked() : 0.0,
+                        e1.getTotalHoursWorked() != null ? e1.getTotalHoursWorked() : 0.0))
                 .toList();
 
         // Attribution des rangs

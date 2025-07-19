@@ -1,6 +1,9 @@
 package org.project.reportingservice.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Getter;
+import lombok.Setter;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -8,8 +11,11 @@ import java.util.List;
  * DTO représentant le résultat complet du reporting mensuel
  * Contient les statistiques globales et le classement des employés
  */
+@Getter
+@Setter
 public class ReportingResultDto {
 
+    // Getters et Setters
     @JsonProperty("reportGeneratedAt")
     private LocalDateTime reportGeneratedAt;
 
@@ -57,7 +63,7 @@ public class ReportingResultDto {
     /**
      * Calcule les totaux à partir des données des employés
      */
-    private void calculateTotals() {
+  /*  private void calculateTotals() {
         if (employeeRankings != null && !employeeRankings.isEmpty()) {
             this.totalEmployees = employeeRankings.size();
             this.totalHoursWorked = employeeRankings.stream()
@@ -71,75 +77,24 @@ public class ReportingResultDto {
                     .average()
                     .orElse(0.0);
         }
+    } */
+
+    private void calculateTotals() {
+        if (employeeRankings != null && !employeeRankings.isEmpty()) {
+            this.totalEmployees = employeeRankings.size();
+            this.totalHoursWorked = employeeRankings.stream()
+                    .mapToDouble(e -> e.getTotalHoursWorked() != null ? e.getTotalHoursWorked() : 0.0)
+                    .sum();
+            this.totalIssuesResolved = employeeRankings.stream()
+                    .mapToInt(e -> e.getTotalIssuesResolved() != null ? e.getTotalIssuesResolved() : 0)
+                    .sum();
+            this.averageResolutionTimeHours = employeeRankings.stream()
+                    .mapToDouble(e -> e.getAverageResolutionTimeHours() != null ? e.getAverageResolutionTimeHours() : 0.0)
+                    .average()
+                    .orElse(0.0);
+        }
     }
 
-    // Getters et Setters
-    public LocalDateTime getReportGeneratedAt() {
-        return reportGeneratedAt;
-    }
 
-    public void setReportGeneratedAt(LocalDateTime reportGeneratedAt) {
-        this.reportGeneratedAt = reportGeneratedAt;
-    }
 
-    public String getMonth() {
-        return month;
-    }
-
-    public void setMonth(String month) {
-        this.month = month;
-    }
-
-    public String getYear() {
-        return year;
-    }
-
-    public void setYear(String year) {
-        this.year = year;
-    }
-
-    public Integer getTotalEmployees() {
-        return totalEmployees;
-    }
-
-    public void setTotalEmployees(Integer totalEmployees) {
-        this.totalEmployees = totalEmployees;
-    }
-
-    public Double getTotalHoursWorked() {
-        return totalHoursWorked;
-    }
-
-    public void setTotalHoursWorked(Double totalHoursWorked) {
-        this.totalHoursWorked = totalHoursWorked;
-    }
-
-    public Integer getTotalIssuesResolved() {
-        return totalIssuesResolved;
-    }
-
-    public void setTotalIssuesResolved(Integer totalIssuesResolved) {
-        this.totalIssuesResolved = totalIssuesResolved;
-    }
-
-    public Double getAverageResolutionTimeHours() {
-        return averageResolutionTimeHours;
-    }
-
-    public void setAverageResolutionTimeHours(Double averageResolutionTimeHours) {
-        this.averageResolutionTimeHours = averageResolutionTimeHours;
-    }
-
-    public List<EmployeePerformanceDto> getEmployeeRankings() {
-        return employeeRankings;
-    }
-
-    public void setEmployeeRankings(List<EmployeePerformanceDto> employeeRankings) {
-        this.employeeRankings = employeeRankings;
-        calculateTotals();
-    }
-
-    public List<EmployeePerformanceDto> getEmployeeReports() {
-        return employeeRankings;
-    }
 }
