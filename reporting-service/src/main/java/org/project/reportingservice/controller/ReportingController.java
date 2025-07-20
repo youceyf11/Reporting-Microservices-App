@@ -1,7 +1,9 @@
 package org.project.reportingservice.controller;
 
 import org.project.reportingservice.dto.EmployeePerformanceDto;
+import org.project.reportingservice.dto.MonthlyStatsDto;
 import org.project.reportingservice.dto.ReportingResultDto;
+import org.project.reportingservice.dto.WeeklyStatsDto;
 import org.project.reportingservice.service.ReportingService;
 import org.project.reportingservice.response.MonthlyStatsResponse;
 import org.project.reportingservice.response.HealthResponse;
@@ -141,11 +143,11 @@ public class ReportingController {
                 });
     }
 
-    @GetMapping("/test-response")
+   /* @GetMapping("/test-response")
     public Mono<ResponseEntity<MonthlyStatsResponse>> testResponse() {
         MonthlyStatsResponse response = new MonthlyStatsResponse(10.0, 2, 5.0);
         return Mono.just(ResponseEntity.ok(response));
-    }
+    } */
 
     /**
      * EndpoInteger pour vérifier la santé du service
@@ -155,6 +157,33 @@ public class ReportingController {
     @GetMapping("/health")
     public Mono<ResponseEntity<HealthResponse>> healthCheck() {
         return Mono.just(ResponseEntity.ok(new HealthResponse("UP", "Reporting service is healthy")));
+    }
+
+    /**
+     * Get weekly statistics for a specific employee
+     */
+    @GetMapping("/weekly/stats/{projectKey}/{assignee}")
+    public Mono<ResponseEntity<WeeklyStatsDto>> getEmployeeWeeklyStats(
+            @PathVariable String projectKey,
+            @PathVariable String assignee) {
+
+        return reportingService.getEmployeeWeeklyStats(projectKey, assignee)
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Get monthly statistics for a specific employee
+     */
+    @GetMapping("/monthly/stats/{projectKey}/{assignee}")
+    public Mono<ResponseEntity<MonthlyStatsDto>> getEmployeeMonthlyStats(
+            @PathVariable String projectKey,
+            @PathVariable String assignee,
+            @RequestParam(defaultValue = "160.0") Double expectedHours) {
+
+        return reportingService.getEmployeeMonthlyStats(projectKey, assignee, expectedHours)
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
     /**
