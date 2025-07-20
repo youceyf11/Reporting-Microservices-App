@@ -1,0 +1,48 @@
+package org.project.jirafetchservice.config;
+
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.stereotype.Component;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+@Component
+public class EnvLoader implements InitializingBean {
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        // Chercher le fichier .env dans le répertoire parent du projet
+        Path envPath = Paths.get(".env");
+
+        // Si .env n'existe pas dans le répertoire courant, chercher dans le parent
+        if (!Files.exists(envPath)) {
+            envPath = Paths.get("../.env");
+        }
+
+        if (Files.exists(envPath)) {
+            try (BufferedReader reader = new BufferedReader(new FileReader(envPath.toFile()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (!line.isEmpty() && !line.startsWith("#")) {
+                        String[] parts = line.split("=", 2);
+                        if (parts.length == 2) {
+                            String key = parts[0].trim();
+                            String value = parts[1].trim();
+                            // Ne pas écraser les variables déjà définies
+                            if (System.getProperty(key) == null && System.getenv(key) == null) {
+                                System.setProperty(key, value);
+                            }
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                System.err.println("Erreur lors du chargement du fichier .env: " + e.getMessage());
+            }
+        }
+    }
+}

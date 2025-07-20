@@ -141,6 +141,12 @@ public class ReportingController {
                 });
     }
 
+    @GetMapping("/test-response")
+    public Mono<ResponseEntity<MonthlyStatsResponse>> testResponse() {
+        MonthlyStatsResponse response = new MonthlyStatsResponse(10.0, 2, 5.0);
+        return Mono.just(ResponseEntity.ok(response));
+    }
+
     /**
      * EndpoInteger pour vérifier la santé du service
      *

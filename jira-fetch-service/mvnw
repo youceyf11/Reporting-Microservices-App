@@ -33,7 +33,7 @@ set -euf
 [ "${MVNW_VERBOSE-}" != debug ] || set -x
 
 # OS specific support.
-native_path() { prIntegerf %s\\n "$1"; }
+native_path() { printf %s\\n "$1"; }
 case "$(uname)" in
 CYGWIN* | MINGW*)
   [ -z "${JAVA_HOME-}" ] || JAVA_HOME="$(cygpath --unix "$JAVA_HOME")"
@@ -83,17 +83,17 @@ hash_string() {
   str="${1:-}" h=0
   while [ -n "$str" ]; do
     char="${str%"${str#?}"}"
-    h=$(((h * 31 + $(LC_CTYPE=C prIntegerf %d "'$char")) % 4294967296))
+    h=$(((h * 31 + $(LC_CTYPE=C printf %d "'$char")) % 4294967296))
     str="${str#?}"
   done
-  prIntegerf %x\\n $h
+  printf %x\\n $h
 }
 
 verbose() { :; }
-[ "${MVNW_VERBOSE-}" != true ] || verbose() { prIntegerf %s\\n "${1-}"; }
+[ "${MVNW_VERBOSE-}" != true ] || verbose() { printf %s\\n "${1-}"; }
 
 die() {
-  prIntegerf %s\\n "$1" >&2
+  printf %s\\n "$1" >&2
   exit 1
 }
 
@@ -102,7 +102,7 @@ trim() {
   #   Trims trailing and leading whitespace, carriage returns, tabs, and linefeeds.
   #   Needed for removing poorly Integererpreted newline sequences when running in more
   #   exotic environments such as mingw bash on Windows.
-  prIntegerf "%s" "${1}" | tr -d '[:space:]'
+  printf "%s" "${1}" | tr -d '[:space:]'
 }
 
 # parse distributionUrl and optional distributionSha256Sum, requires .mvn/wrapper/maven-wrapper.properties
