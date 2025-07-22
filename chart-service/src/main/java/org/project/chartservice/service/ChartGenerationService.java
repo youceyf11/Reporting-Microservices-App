@@ -36,6 +36,9 @@ public class ChartGenerationService implements IChartGenerationService {
     }
 
     private byte[] generateWeeklyBarChart(List<EmployeePerformanceDto> employees, String projectKey) throws IOException {
+        if (employees == null) {
+            throw new IllegalArgumentException("La liste des employés est nulle");
+        }
         CategoryChart chart = new CategoryChartBuilder()
                 .width(800)
                 .height(600)
@@ -68,6 +71,9 @@ public class ChartGenerationService implements IChartGenerationService {
     }
 
     private byte[] generateMonthlyBarChart(List<EmployeePerformanceDto> employees, String projectKey) throws IOException {
+        if (employees == null) {
+            throw new IllegalArgumentException("La liste des employés est nulle");
+        }
         CategoryChart chart = new CategoryChartBuilder()
                 .width(800)
                 .height(600)
@@ -93,6 +99,9 @@ public class ChartGenerationService implements IChartGenerationService {
     }
 
     private byte[] generateComparativeChart(List<EmployeePerformanceDto> employees, String projectKey) throws IOException {
+        if (employees == null) {
+            throw new IllegalArgumentException("La liste des employés est nulle");
+        }
         CategoryChart chart = new CategoryChartBuilder()
                 .width(900)
                 .height(600)

@@ -17,7 +17,5 @@ public class ReportingResultDto {
     public ReportingResultDto(List<EmployeePerformanceDto> employees) {
         this.employees = employees;
     }
-    
-    public List<EmployeePerformanceDto> getEmployees() { return employees; }
-    public void setEmployees(List<EmployeePerformanceDto> employees) { this.employees = employees; }
+
 }

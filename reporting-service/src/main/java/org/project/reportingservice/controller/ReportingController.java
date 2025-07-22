@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Contrôleur REST pour les endpoIntegers de reporting
@@ -184,6 +185,11 @@ public class ReportingController {
         return reportingService.getEmployeeMonthlyStats(projectKey, assignee, expectedHours)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/monthly/detailed/{projectKey}")
+    public Mono<Map<String, Map<Integer, Double>>> getDetailedMonthlyStatistics(@PathVariable String projectKey) {
+        return reportingService.getDetailedMonthlyStatistics(projectKey);
     }
 
     /**

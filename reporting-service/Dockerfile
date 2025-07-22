@@ -5,11 +5,8 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 
 # Étape 3 : Copier le JAR
-COPY /target/reporting-service-0.0.1-SNAPSHOT.jar app.jar
+COPY target/reporting-service-0.0.1-SNAPSHOT.jar app.jar
 
-
-# Étape 4 : Exposer le port (à adapter si différent)
-EXPOSE 8082
 
 # Étape 5 : Lancer l'application
 ENTRYPOINT ["java", "-jar", "app.jar"]

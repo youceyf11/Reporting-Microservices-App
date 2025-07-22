@@ -1,24 +1,24 @@
-version: '3.8'
 
 services:
   jira-fetch-service:
     build:
       context: ./jira-fetch-service
-      dockerfile: dockerfile
+      dockerfile: Dockerfile
     ports:
-      - "8081:8081"
+      - "${JIRA_FETCH_SERVICE_PORT}:8081"
     environment:
-      - JIRA_FETCH_SERVICE_PORT=${JIRA_FETCH_SERVICE_PORT}
       - JIRA_BASE_URL=${JIRA_BASE_URL}
       - JIRA_USERNAME=${JIRA_USERNAME}
       - JIRA_API_TOKEN=${JIRA_API_TOKEN}
+      - JIRA_FETCH_SERVICE_PORT=${JIRA_FETCH_SERVICE_PORT}
+
 
   reporting-service:
     build:
       context: ./reporting-service
-      dockerfile: dockerfile
+      dockerfile: Dockerfile
     ports:
-      - "8082:8082"
+      - "${REPORTING_SERVICE_PORT}:8082"
     environment:
       - REPORTING_SERVICE_PORT=${REPORTING_SERVICE_PORT}
       - JIRA_FETCH_BASE_URL=${JIRA_FETCH_BASE_URL}
@@ -26,9 +26,11 @@ services:
       - jira-fetch-service
 
   chart-service:
-    build: ./chart-service
+    build:
+        context: ./chart-service
+        dockerfile: Dockerfile
     ports:
-      - "8083:8083"
+      - "${CHART_SERVICE_PORT}:8083"
     environment:
       - MAIL_USERNAME=${MAIL_USERNAME}
       - MAIL_PASSWORD=${MAIL_PASSWORD}
