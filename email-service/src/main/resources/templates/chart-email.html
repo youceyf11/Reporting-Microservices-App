@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chart Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #333; margin: 0; }
+        .content { margin-bottom: 20px; }
+        .chart-info { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 th:text="${subject}">Chart Report</h1>
+        </div>
+        
+        <div class="content">
+            <p>Hello,</p>
+            <p>Please find attached your requested chart report for project: <strong th:text="${projectKey}">PROJECT-KEY</strong></p>
+            
+            <div class="chart-info">
+                <h3>Chart Details:</h3>
+                <ul>
+                    <li><strong>Chart Type:</strong> <span th:text="${chartType}">Monthly Report</span></li>
+                    <li><strong>Project:</strong> <span th:text="${projectKey}">PROJECT-KEY</span></li>
+                    <li><strong>Generated:</strong> <span th:text="${generatedAt}">2024-01-01 12:00:00</span></li>
+                    <li><strong>Total Employees:</strong> <span th:text="${employeeCount}">5</span></li>
+                </ul>
+            </div>
+            
+            <p>The chart is attached as a PNG image file. If you have any questions, please don't hesitate to contact us.</p>
+        </div>
+        
+        <div class="footer">
+            <p>This email was generated automatically by the Reporting System.</p>
+        </div>
+    </div>
+</body>
+</html>
