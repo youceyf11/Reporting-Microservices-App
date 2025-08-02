@@ -7,16 +7,16 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
-import java.util.Map;
 import java.util.List;
-import java.time.Instant;
 import org.project.emailservice.dto.EmailRequest;
 import org.project.emailservice.dto.EmailResponse;
 import org.project.emailservice.dto.EmailAttachment;
-import org.project.emailservice.enums.EmailPriority;
 import org.project.emailservice.service.EmailService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,32 +42,46 @@ public class EmailController {
                 .map(response -> ResponseEntity.accepted().body(response));
     }
     
-    @PostMapping("/send/chart")
+
+     /**
+     * Envoie un e-mail de rapport contenant un graphique en pièce jointe.
+     * <p>
+     * Attend une requête multipart :
+     * <ul>
+     *   <li><strong>request</strong> : métadonnées de l’e-mail au format JSON ({@link org.project.emailservice.dto.EmailRequest}).</li>
+     *   <li><strong>file</strong> : image du graphique à joindre.</li>
+     * </ul>
+     * @param meta métadonnées de l’e-mail (partie « request »)
+     * @param file fichier image du graphique (partie « file »)
+     * @return <code>Mono</code> émettant une réponse HTTP 202 avec {@link org.project.emailservice.dto.EmailResponse}
+     */
+    @PostMapping(value = "/send/chart", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Mono<ResponseEntity<EmailResponse>> sendChartEmail(
-            @RequestParam String to,
-            @RequestParam String projectKey,
-            @RequestParam String chartType,
-            @RequestBody byte[] chartData) {
-        
-        EmailRequest request = EmailRequest.builder()
-                .to(to)
-                .subject("Chart Report - " + projectKey)
+            @RequestPart("request") @Valid EmailRequest meta,
+            @RequestPart("file") MultipartFile file) {
+
+        byte[] chartData;
+        try {
+            chartData = file.getBytes();
+        } catch (Exception e) {
+            return Mono.error(e);
+        }
+
+        EmailRequest request = meta.toBuilder()
+                .subject(meta.getSubject() != null ? meta.getSubject()
+                        : "Chart Report - " + meta.getTemplateData().getOrDefault("projectKey", ""))
                 .templateName("chart-email")
-                .templateData(Map.of(
-                    "projectKey", projectKey,
-                    "chartType", chartType,
-                    "generatedAt", Instant.now()
-                ))
                 .attachments(List.of(
-                    EmailAttachment.builder()
-                        .filename(chartType + "-" + projectKey + ".png")
-                        .content(chartData)
-                        .contentType("image/png")
-                        .build()
-                ))
-                .priority(EmailPriority.NORMAL)
+                        EmailAttachment.builder()
+                                .filename(meta.getTemplateData() != null
+                                        ? meta.getTemplateData().getOrDefault("chartType", "chart") + "-" +
+                                          meta.getTemplateData().getOrDefault("projectKey", "proj") + ".png"
+                                        : file.getOriginalFilename())
+                                .content(chartData)
+                                .contentType(file.getContentType() != null ? file.getContentType() : "image/png")
+                                .build()))
                 .build();
-        
+
         return emailService.processEmailRequest(request)
                 .map(response -> ResponseEntity.accepted().body(response));
     }

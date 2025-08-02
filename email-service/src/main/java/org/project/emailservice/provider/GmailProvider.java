@@ -1,6 +1,6 @@
 package org.project.emailservice.provider;
 
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.project.emailservice.dto.EmailRequest;
@@ -14,13 +14,18 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.StringUtils;
 
-@Component
 @Slf4j
 @RequiredArgsConstructor
+@Service
 public class GmailProvider implements EmailProvider {
     
     private final JavaMailSender javaMailSender;
+    
+    @Value("${spring.mail.username:}")
+    private String defaultFrom;
     
     @Override
     public String getName() {
@@ -49,7 +54,12 @@ public class GmailProvider implements EmailProvider {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setTo(emailRequest.getTo());
-            helper.setFrom(emailRequest.getFrom());
+            // Utilise l'adresse fournie, sinon la valeur de spring.mail.username
+            String fromAddress = StringUtils.hasText(emailRequest.getFrom()) ?
+                    emailRequest.getFrom() :
+                    (StringUtils.hasText(defaultFrom) ? defaultFrom : "no-reply@localhost");
+            helper.setFrom(fromAddress);
+
             helper.setSubject(emailRequest.getSubject());
 
             if (emailRequest.getTemplateData() != null && 

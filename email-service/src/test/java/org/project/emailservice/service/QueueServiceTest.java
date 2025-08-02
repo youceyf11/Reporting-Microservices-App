@@ -6,18 +6,23 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import org.project.emailservice.dto.EmailRequest;
+import org.project.emailservice.dto.EmailMessagePayload;
 import org.project.emailservice.enums.EmailPriority;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import reactor.rabbitmq.Sender;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import reactor.rabbitmq.Sender;
+import org.springframework.amqp.AmqpException;
 
 import java.util.Map;
 
-import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -35,6 +40,12 @@ import static org.mockito.Mockito.*;
 @DisplayName("QueueService Unit Tests - Tests de gestion des queues RabbitMQ")
 class QueueServiceTest {
 
+    private static final String EXCHANGE_NAME = "test-exchange";
+    private static final String ROUTING_KEY = "test-routing-key";
+
+    @Mock
+    private RabbitTemplate rabbitTemplate;
+    
     @Mock
     private Sender sender;
     
@@ -49,9 +60,9 @@ class QueueServiceTest {
 
     @BeforeEach
     void setUp() throws JsonProcessingException {
-        // Utiliser lenient() pour éviter les UnnecessaryStubbingException pour les stubs définis ici
-        lenient().when(sender.send(argThat(outboundMessage -> true)))
-                .thenReturn(Mono.empty());
+        queueService = new QueueService(rabbitTemplate, sender, objectMapper);
+        ReflectionTestUtils.setField(queueService, "exchangeName", EXCHANGE_NAME);
+        ReflectionTestUtils.setField(queueService, "routingKey", ROUTING_KEY);
 
         // Simuler la sérialisation pour différents objets
         lenient().when(objectMapper.writeValueAsBytes(any(EmailRequest.class)))
@@ -65,8 +76,6 @@ class QueueServiceTest {
                         return "low-priority-json".getBytes();
                     }
                 });
-
-        queueService = new QueueService(sender, objectMapper);
 
         // Emails avec différentes priorités
         highPriorityEmail = EmailRequest.builder()
@@ -98,13 +107,13 @@ class QueueServiceTest {
     @DisplayName("queueEmail() - Routage priorité HIGH vers queue high")
     void testQueueEmail_HighPriority() throws JsonProcessingException {
         // ACT
-        Mono<Void> result = queueService.queueEmail(highPriorityEmail);
+        Mono<Void> result = queueService.queueEmail(highPriorityEmail,"HIGH");
 
         // ASSERT
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(sender).send(argThat(outboundMessage -> true));
+        verify(rabbitTemplate).convertAndSend(eq(EXCHANGE_NAME), eq(ROUTING_KEY), any(EmailMessagePayload.class));
         verify(objectMapper).writeValueAsBytes(highPriorityEmail);
     }
 
@@ -112,13 +121,13 @@ class QueueServiceTest {
     @DisplayName("queueEmail() - Routage priorité NORMAL vers queue normal")
     void testQueueEmail_NormalPriority() throws JsonProcessingException {
         // ACT
-        Mono<Void> result = queueService.queueEmail(normalPriorityEmail);
+        Mono<Void> result = queueService.queueEmail(normalPriorityEmail, "NORMAL");
 
         // ASSERT
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(sender).send(argThat(outboundMessage -> true));
+        verify(rabbitTemplate).convertAndSend(eq(EXCHANGE_NAME), eq(ROUTING_KEY), any(EmailMessagePayload.class));
         verify(objectMapper).writeValueAsBytes(normalPriorityEmail);
     }
 
@@ -126,13 +135,13 @@ class QueueServiceTest {
     @DisplayName("queueEmail() - Routage priorité LOW vers queue low")
     void testQueueEmail_LowPriority() throws JsonProcessingException {
         // ACT
-        Mono<Void> result = queueService.queueEmail(lowPriorityEmail);
+        Mono<Void> result = queueService.queueEmail(lowPriorityEmail, "LOW");
 
         // ASSERT
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(sender).send(argThat(outboundMessage -> true));
+        verify(rabbitTemplate).convertAndSend(eq(EXCHANGE_NAME), eq(ROUTING_KEY), any(EmailMessagePayload.class));
         verify(objectMapper).writeValueAsBytes(lowPriorityEmail);
     }
 
@@ -140,18 +149,18 @@ class QueueServiceTest {
     @DisplayName("queueEmail() - Gestion d'erreur RabbitMQ")
     void testQueueEmail_RabbitMQError() {
         // ARRANGE - Configurer le mock pour retourner une erreur
-        when(sender.send(argThat(outboundMessage -> true)))
-                .thenReturn(Mono.error(new RuntimeException("RabbitMQ connection failed")));
+        doThrow(new AmqpException("RabbitMQ connection failed"))
+                .when(rabbitTemplate).convertAndSend(eq(EXCHANGE_NAME), eq(ROUTING_KEY), any(EmailMessagePayload.class));
 
         // ACT
-        Mono<Void> result = queueService.queueEmail(normalPriorityEmail);
+        Mono<Void> result = queueService.queueEmail(normalPriorityEmail,"NORMAL");
 
         // ASSERT
         StepVerifier.create(result)
                 .expectError(RuntimeException.class)
                 .verify();
 
-        verify(sender).send(argThat(outboundMessage -> true));
+        verify(rabbitTemplate).convertAndSend(eq(EXCHANGE_NAME), eq(ROUTING_KEY), any(EmailMessagePayload.class));
     }
 
     @Test
@@ -162,7 +171,7 @@ class QueueServiceTest {
                 .thenThrow(new RuntimeException("JSON serialization failed"));
 
         // ACT
-        Mono<Void> result = queueService.queueEmail(normalPriorityEmail);
+        Mono<Void> result = queueService.queueEmail(normalPriorityEmail,"NORMAL");
 
         // ASSERT
         StepVerifier.create(result)
@@ -170,7 +179,7 @@ class QueueServiceTest {
                 .verify();
 
         verify(objectMapper).writeValueAsBytes(normalPriorityEmail);
-        verify(sender, never()).send(argThat(outboundMessage -> true));
+        verify(rabbitTemplate, never()).convertAndSend(eq(EXCHANGE_NAME), eq(ROUTING_KEY), any(EmailMessagePayload.class));
     }
 
     @Test
@@ -186,13 +195,13 @@ class QueueServiceTest {
                 .build();
 
         // ACT
-        Mono<Void> result = queueService.queueEmail(emailWithoutPriority);
+        Mono<Void> result = queueService.queueEmail(emailWithoutPriority,"NORMAL");
 
         // ASSERT
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(sender).send(argThat(outboundMessage -> true));
+        verify(rabbitTemplate).convertAndSend(eq(EXCHANGE_NAME), eq(ROUTING_KEY), any(EmailMessagePayload.class));
         verify(objectMapper).writeValueAsBytes(emailWithoutPriority);
     }
 
@@ -213,12 +222,12 @@ class QueueServiceTest {
                     .templateData(Map.of("index", String.valueOf(i)))
                     .build();
             
-            StepVerifier.create(queueService.queueEmail(email))
+            StepVerifier.create(queueService.queueEmail(email, "EMAIL-" + i))
                     .verifyComplete();
         }
 
         // Vérifier que RabbitMQ a été appelé le bon nombre de fois
-        verify(sender, times(numberOfEmails)).send(argThat(outboundMessage -> true));
+        verify(rabbitTemplate, times(numberOfEmails)).convertAndSend(eq(EXCHANGE_NAME), eq(ROUTING_KEY), any(EmailMessagePayload.class));
         verify(objectMapper, times(numberOfEmails)).writeValueAsBytes(any(EmailRequest.class));
     }
 
@@ -226,15 +235,15 @@ class QueueServiceTest {
     @DisplayName("Test de routage correct selon les priorités")
     void testPriorityRouting() throws JsonProcessingException {
         // ACT - Envoyer des emails de chaque priorité
-        StepVerifier.create(queueService.queueEmail(highPriorityEmail))
+        StepVerifier.create(queueService.queueEmail(highPriorityEmail,"HIGH"))
                 .verifyComplete();
-        StepVerifier.create(queueService.queueEmail(normalPriorityEmail))
+        StepVerifier.create(queueService.queueEmail(normalPriorityEmail,"NORMAL"))
                 .verifyComplete();
-        StepVerifier.create(queueService.queueEmail(lowPriorityEmail))
+        StepVerifier.create(queueService.queueEmail(lowPriorityEmail,"LOW"))
                 .verifyComplete();
 
         // ASSERT - Vérifier le bon nombre d'appels
-        verify(sender, times(3)).send(argThat(outboundMessage -> true));
+        verify(rabbitTemplate, times(3)).convertAndSend(eq(EXCHANGE_NAME), eq(ROUTING_KEY), any(EmailMessagePayload.class));
         verify(objectMapper, times(3)).writeValueAsBytes(any(EmailRequest.class));
     }
 
@@ -251,13 +260,13 @@ class QueueServiceTest {
                 .build();
 
         // ACT
-        Mono<Void> result = queueService.queueEmail(urgentEmail);
+        Mono<Void> result = queueService.queueEmail(urgentEmail,"URGENT");
 
         // ASSERT
         StepVerifier.create(result)
                 .verifyComplete();
 
-        verify(sender).send(argThat(outboundMessage -> true));
+        verify(rabbitTemplate).convertAndSend(eq(EXCHANGE_NAME), eq(ROUTING_KEY), any(EmailMessagePayload.class));
         verify(objectMapper).writeValueAsBytes(urgentEmail);
     }
 }

@@ -2,9 +2,15 @@ package org.project.emailservice.service;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import lombok.RequiredArgsConstructor;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Mono;
+import reactor.rabbitmq.Sender;
+
 import org.project.emailservice.dto.EmailRequest;
+import org.project.emailservice.enums.EmailPriority;
 import org.project.emailservice.dto.EmailMessagePayload;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
@@ -14,26 +20,72 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
  */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class QueueService {
 
-    @Value("${rabbitmq.routing.key.name}")
-    private String routingKey;
+    @Value("${rabbitmq.routing.key.urgent}")
+    private String urgentPriorityRoutingKey;
+
+    @Value("${rabbitmq.routing.key.high}")
+    private String highPriorityRoutingKey;
+
+    @Value("${rabbitmq.routing.key.normal}")
+    private String normalPriorityRoutingKey;
+
+    @Value("${rabbitmq.routing.key.low}")
+    private String lowPriorityRoutingKey;
 
     @Value("${rabbitmq.exchange.name}")
     private String exchangeName;
 
     private final RabbitTemplate rabbitTemplate;
 
+    private final Sender sender;  
+
+    private final ObjectMapper objectMapper;
+
+    public QueueService(RabbitTemplate rabbitTemplate, Sender sender, ObjectMapper objectMapper) {
+        this.rabbitTemplate = rabbitTemplate;
+        this.sender = sender;
+        this.objectMapper = objectMapper;
+    }
+     
+
     /**
      * Met en file d'attente un email pour un traitement asynchrone.
      *
      * @param emailRequest Les détails de l'email à envoyer.
      * @param emailId L'ID unique de l'email pour le suivi.
+     * @return Mono&lt;Void&gt; qui se complete quand le message est envoyé
      */
-    public void queueEmail(EmailRequest emailRequest, String emailId) {
-        EmailMessagePayload payload = new EmailMessagePayload(emailId, emailRequest);
-        log.info("Sending email payload to queue for emailId: {}", emailId);
-        rabbitTemplate.convertAndSend(exchangeName, routingKey, payload);
+    public Mono<Void> queueEmail(EmailRequest emailRequest, String emailId) {
+        return Mono.fromRunnable(() -> {
+            String routingKey = getRoutingKeyForPriority(emailRequest.getPriority());
+            EmailMessagePayload payload = new EmailMessagePayload(emailId, emailRequest, routingKey);
+            log.info("Sending email payload to queue for emailId: {} with routing key: {}", emailId, routingKey);
+            try {
+                String jsonPayload= objectMapper.writeValueAsString(payload);
+                rabbitTemplate.convertAndSend(exchangeName,routingKey,jsonPayload);
+            }catch(Exception e){
+                log.error("Failed to serialise email payload for id {}", emailId,e);
+            }
+        });
+    }
+
+
+    private String getRoutingKeyForPriority(EmailPriority priority) {
+        if (priority == null) {
+            return normalPriorityRoutingKey;
+        }
+        switch (priority) {
+            case URGENT:
+                return urgentPriorityRoutingKey;
+            case HIGH:
+                return highPriorityRoutingKey;
+            case LOW:
+                return lowPriorityRoutingKey;
+            case NORMAL:
+            default:
+                return normalPriorityRoutingKey;
+        }
     }
 }

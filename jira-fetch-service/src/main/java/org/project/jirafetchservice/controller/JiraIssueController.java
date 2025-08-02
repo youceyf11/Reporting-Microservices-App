@@ -4,7 +4,6 @@ import org.project.jirafetchservice.dto.IssueSimpleDto;
 import org.project.jirafetchservice.jiraApi.JiraIssueApiResponse;
 import org.project.jirafetchservice.mapper.JiraMapper;
 import org.project.jirafetchservice.service.JiraIssueService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;

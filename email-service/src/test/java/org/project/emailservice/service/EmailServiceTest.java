@@ -12,18 +12,17 @@ import org.springframework.data.redis.core.ReactiveValueOperations;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
-
 import org.project.emailservice.dto.EmailRequest;
 import org.project.emailservice.dto.EmailResponse;
 import org.project.emailservice.dto.EmailAttachment;
 import org.project.emailservice.entity.EmailLog;
 import org.project.emailservice.enums.EmailStatus;
 import org.project.emailservice.enums.EmailPriority;
-
 import java.time.Instant;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -68,9 +67,14 @@ class EmailServiceTest {
     @BeforeEach // @BeforeEach est un hook qui s'exécute avant chaque test
     void setUp() {
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        lenient().when(valueOperations.set(anyString(), any(EmailLog.class))).thenReturn(Mono.just(true));
         lenient().when(valueOperations.set(anyString(), any(EmailLog.class), any(Duration.class))).thenReturn(Mono.just(true));
         lenient().when(valueOperations.get(anyString())).thenReturn(Mono.empty());
+        lenient().when(valueOperations.multiGet(anyList())).thenReturn(Mono.just(List.of()));
+
         lenient().when(queueService.queueEmail(any(EmailRequest.class), anyString())).thenReturn(Mono.empty());
+
         lenient().when(templateService.renderTemplate(anyString(), anyMap())).thenReturn(Mono.just("<html>Test</html>"));
         lenient().when(providerService.sendEmail(any(EmailRequest.class))).thenReturn(Mono.just("test-message-id"));
 
@@ -122,7 +126,7 @@ class EmailServiceTest {
                 .verifyComplete();
 
         verify(valueOperations).set(anyString(), any(EmailLog.class), any(Duration.class));
-        verify(queueService).queueEmail(any(EmailRequest.class));
+        verify(queueService).queueEmail(any(EmailRequest.class), anyString());
     }
 
     @Test
@@ -141,7 +145,7 @@ class EmailServiceTest {
                 .verify();
 
         // Vérifier que la queue n'est pas appelée en cas d'erreur Redis
-        verify(queueService, never()).queueEmail(any(EmailRequest.class));
+        verify(queueService, never()).queueEmail(any(EmailRequest.class), anyString());
     }
 
     @Test
@@ -150,7 +154,7 @@ class EmailServiceTest {
         // ARRANGE
         lenient().when(valueOperations.set(anyString(), any(EmailLog.class), any(Duration.class)))
                 .thenReturn(Mono.just(true));
-        when(queueService.queueEmail(any(EmailRequest.class)))
+        when(queueService.queueEmail(any(EmailRequest.class), anyString()))
                 .thenReturn(Mono.error(new RuntimeException("RabbitMQ connection failed")));
 
         // ACT
@@ -162,37 +166,34 @@ class EmailServiceTest {
                 .verify();
 
         verify(valueOperations).set(anyString(), any(EmailLog.class), any(Duration.class));
-        verify(queueService).queueEmail(any(EmailRequest.class));
+        verify(queueService).queueEmail(any(EmailRequest.class), anyString());
     }
 
     @Test
     @DisplayName("sendChartEmail - Succès de l'envoi")
     void testSendChartEmail_Success() {
         // ARRANGE
-        byte[] chartData = "fake-chart-data".getBytes();
-        EmailRequest request = EmailRequest.builder()
-                .to("recipient@example.com")
-                .subject("Monthly Report")
-                .body("Please find the attached chart.")
-                .attachments(List.of(new EmailAttachment("chart.png", chartData, "image/png")))
-                .priority(EmailPriority.HIGH)
-                .build();
+        byte[] chartImage = "fake-chart-data".getBytes();
+        Map<String, Object> chartData = new HashMap<>();
+        chartData.put("recipientName", "Test User");
+        chartData.put("chartTitle", "Monthly Report");
 
-        when(templateService.generateChartEmailContent(anyMap())).thenReturn(Mono.just("<html><body>Generated Chart</body></html>"));
-        when(queueService.sendMessage(any(EmailRequest.class), eq(EmailPriority.HIGH))).thenReturn(Mono.empty());
+        String MOCKED_HTML_CONTENT = "<h1>Test Chart</h1><p>This is a test chart email.</p>";
 
-        // ACT
-        StepVerifier.create(emailService.sendChartEmail(chartData, request.getTo(), request.getSubject()))
-                // ASSERT
-                .expectNextMatches(response -> {
+        when(templateService.renderChartEmailTemplate(anyMap())).thenReturn(Mono.just(MOCKED_HTML_CONTENT));
+
+        // ACT & ASSERT
+        StepVerifier.create(emailService.sendChartEmail("recipient@example.com", "Monthly Report", chartData, chartImage))
+                .assertNext(response -> {
                     assert response.getEmailId() != null;
                     assert response.getStatus() == EmailStatus.QUEUED;
                     assert response.getMessage().contains("queued");
-                    verify(queueService).sendMessage(any(EmailRequest.class), eq(EmailPriority.HIGH));
-                    verify(templateService).generateChartEmailContent(anyMap());
-                    return true;
                 })
                 .verifyComplete();
+
+        // VERIFY
+        verify(templateService).renderChartEmailTemplate(anyMap());
+        verify(queueService).queueEmail(any(EmailRequest.class), anyString());
     }
 
     @Test
@@ -210,7 +211,7 @@ class EmailServiceTest {
                 .createdAt(Instant.now())
                 .build();
 
-        when(valueOperations.get(emailId)).thenReturn(Mono.just(foundLog));
+        when(valueOperations.get(eq("email:" + emailId))).thenReturn(Mono.just(foundLog));
 
         // ACT
         StepVerifier.create(emailService.getEmailStatus(emailId))
@@ -221,7 +222,7 @@ class EmailServiceTest {
                 )
                 .verifyComplete();
 
-        verify(valueOperations).get(emailId);
+        verify(valueOperations).get(eq("email:" + emailId));
     }
 
     @Test
@@ -229,7 +230,7 @@ class EmailServiceTest {
     void testGetEmailStatus_NotFound() {
         // ARRANGE
         String emailId = "not-found-id";
-        when(valueOperations.get(emailId)).thenReturn(Mono.empty());
+        when(valueOperations.get(eq("email:" + emailId))).thenReturn(Mono.empty());
 
         // ACT
         StepVerifier.create(emailService.getEmailStatus(emailId))
@@ -240,7 +241,7 @@ class EmailServiceTest {
                 )
                 .verifyComplete();
 
-        verify(valueOperations).get(emailId);
+        verify(valueOperations).get(eq("email:" + emailId));
     }
 
     @Test
@@ -267,8 +268,8 @@ class EmailServiceTest {
                 .createdAt(Instant.now())
                 .build();
 
-        when(valueOperations.get("id1")).thenReturn(Mono.just(log1));
-        when(valueOperations.get("id2")).thenReturn(Mono.just(log2));
+        List<String> prefixedIds = emailIds.stream().map(id -> "email:" + id).toList();
+        when(valueOperations.multiGet(eq(prefixedIds))).thenReturn(Mono.just(List.of(log1, log2)));
 
         // ACT
         StepVerifier.create(emailService.getBulkEmailStatus(emailIds))
@@ -277,8 +278,7 @@ class EmailServiceTest {
                 .expectNextMatches(response -> response.getEmailId().equals("id2") && response.getStatus() == EmailStatus.FAILED)
                 .verifyComplete();
 
-        verify(valueOperations).get("id1");
-        verify(valueOperations).get("id2");
+        verify(valueOperations).multiGet(eq(prefixedIds));
     }
 
     @Test
@@ -296,8 +296,8 @@ class EmailServiceTest {
                 .createdAt(Instant.now())
                 .build();
 
-        when(valueOperations.get("id1")).thenReturn(Mono.just(log1));
-        when(valueOperations.get("id-not-found")).thenReturn(Mono.empty());
+        List<String> prefixedIds = emailIds.stream().map(id -> "email:" + id).toList();
+        when(valueOperations.multiGet(eq(prefixedIds))).thenReturn(Mono.just(List.of(log1)));
 
         // ACT
         StepVerifier.create(emailService.getBulkEmailStatus(emailIds))
@@ -306,8 +306,7 @@ class EmailServiceTest {
                 .expectNextMatches(response -> response.getEmailId().equals("id-not-found") && response.getStatus() == EmailStatus.NOT_FOUND)
                 .verifyComplete();
 
-        verify(valueOperations).get("id1");
-        verify(valueOperations).get("id-not-found");
+        verify(valueOperations).multiGet(eq(prefixedIds));
     }
 
     @Test
@@ -325,16 +324,16 @@ class EmailServiceTest {
                 .createdAt(Instant.now())
                 .build();
 
-        when(valueOperations.get(emailId)).thenReturn(Mono.just(existingLog));
-        when(valueOperations.set(eq(emailId), any(EmailLog.class))).thenReturn(Mono.just(true));
+        when(valueOperations.get(eq("email:" + emailId))).thenReturn(Mono.just(existingLog));
+        when(valueOperations.set(eq("email:" + emailId), any(EmailLog.class))).thenReturn(Mono.just(true));
 
         // ACT
-        StepVerifier.create(emailService.updateEmailStatus(emailId, EmailStatus.SENT, "provider-name", null))
+        StepVerifier.create(emailService.updateEmailStatus(emailId, EmailStatus.SENT, null))
                 // ASSERT
                 .verifyComplete();
 
-        verify(valueOperations).get(emailId);
-        verify(valueOperations).set(eq(emailId), any(EmailLog.class));
+        verify(valueOperations).get(eq("email:" + emailId));
+        verify(valueOperations).set(eq("email:" + emailId), any(EmailLog.class));
     }
 
     @Test
@@ -342,14 +341,16 @@ class EmailServiceTest {
     void testUpdateEmailStatus_LogNotFound() {
         // ARRANGE
         String emailId = "not-found-id";
-        when(valueOperations.get(emailId)).thenReturn(Mono.empty());
+        when(valueOperations.get(eq("email:" + emailId))).thenReturn(Mono.empty());
 
         // ACT
-        StepVerifier.create(emailService.updateEmailStatus(emailId, EmailStatus.SENT, "provider-name", null))
+        StepVerifier.create(emailService.updateEmailStatus(emailId, EmailStatus.SENT, "SMTP error"))
                 // ASSERT
                 .verifyComplete();
 
-        verify(valueOperations).get(emailId);
+        verify(valueOperations).get(eq("email:" + emailId));
+        // When log is not found, a new one is created and saved.
+        verify(valueOperations).set(eq("email:" + emailId), any(EmailLog.class), any(Duration.class));
     }
 
     @Test
@@ -367,27 +368,21 @@ class EmailServiceTest {
                 .createdAt(Instant.now())
                 .build();
 
-        when(valueOperations.get(emailId)).thenReturn(Mono.just(existingLog));
-        when(valueOperations.set(eq(emailId), any(EmailLog.class))).thenReturn(Mono.just(false));
+        when(valueOperations.get(eq("email:" + emailId))).thenReturn(Mono.just(existingLog));
+        when(valueOperations.set(eq("email:" + emailId), any(EmailLog.class))).thenReturn(Mono.just(false));
 
         // ACT
-        StepVerifier.create(emailService.updateEmailStatus(emailId, EmailStatus.SENT, "provider-name", null))
+        StepVerifier.create(emailService.updateEmailStatus(emailId, EmailStatus.SENT, "SMTP error"))
                 // ASSERT
                 .verifyComplete();
 
-        verify(valueOperations).get(emailId);
-        verify(valueOperations).set(eq(emailId), any(EmailLog.class));
+        verify(valueOperations).get(eq("email:" + emailId));
+        verify(valueOperations).set(eq("email:" + emailId), any(EmailLog.class));
     }
 
     @Test
     @DisplayName("Test de performance - Envoi de multiples emails")
     void testSendMultipleEmails_Performance() {
-        // ARRANGE
-        lenient().when(valueOperations.set(anyString(), any(EmailLog.class), any(Duration.class)))
-                .thenReturn(Mono.just(true));
-        when(queueService.queueEmail(any(EmailRequest.class)))
-                .thenReturn(Mono.empty());
-
         // ACT - Envoyer 10 emails en parallèle
         Flux<EmailResponse> result = Flux.range(1, 10)
                 .flatMap(i -> {
@@ -404,7 +399,7 @@ class EmailServiceTest {
 
         // Vérifier que tous les emails ont été traités
         verify(valueOperations, times(10)).set(anyString(), any(EmailLog.class), any(Duration.class));
-        verify(queueService, times(10)).queueEmail(any(EmailRequest.class));
+        verify(queueService, times(10)).queueEmail(any(EmailRequest.class), anyString());
     }
 
     @Test
@@ -415,9 +410,6 @@ class EmailServiceTest {
                 .subject("Test")
                 // Pas d'adresse destinataire
                 .build();
-
-        lenient().when(valueOperations.set(anyString(), any(EmailLog.class), any(Duration.class)))
-                .thenReturn(Mono.just(true));
 
         // ACT & ASSERT - Le service doit gérer les données invalides
         StepVerifier.create(emailService.processEmailRequest(invalidRequest))

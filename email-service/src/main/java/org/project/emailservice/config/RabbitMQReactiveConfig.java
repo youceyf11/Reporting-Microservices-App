@@ -1,14 +1,24 @@
 package org.project.emailservice.config;
 
 import com.rabbitmq.client.ConnectionFactory;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.Declarables;
+import org.springframework.amqp.core.ExchangeBuilder;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.amqp.core.TopicExchange;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import reactor.rabbitmq.Sender;
-import reactor.rabbitmq.SenderOptions;
 import reactor.rabbitmq.Receiver;
+import reactor.rabbitmq.SenderOptions;
 import reactor.rabbitmq.ReceiverOptions;
 import reactor.rabbitmq.RabbitFlux;
+import lombok.extern.slf4j.Slf4j;
+import jakarta.annotation.PostConstruct;
+import org.springframework.amqp.core.AmqpAdmin;
 
 /**
  * Configuration pour RabbitMQ réactif.
@@ -20,12 +30,37 @@ import reactor.rabbitmq.RabbitFlux;
  * @since 1.0
  */
 @Configuration
+@Slf4j
 public class RabbitMQReactiveConfig {
 
     public static final String EMAIL_EXCHANGE = "email.exchange";
-    public static final String EMAIL_HIGH = "email.high";
-    public static final String EMAIL_NORMAL = "email.normal";
-    public static final String EMAIL_LOW = "email.low";
+    public static final String URGENT_PRIORITY_QUEUE_NAME = "email.queue.urgent";
+    public static final String HIGH_PRIORITY_QUEUE_NAME = "email.queue.high";
+    public static final String NORMAL_QUEUE_NAME = "email.queue.normal";
+    public static final String LOW_PRIORITY_QUEUE_NAME = "email.queue.low";
+
+    public static final String URGENT_PRIORITY_ROUTING_KEY = "email.urgent";
+    public static final String HIGH_PRIORITY_ROUTING_KEY = "email.high";
+    public static final String NORMAL_PRIORITY_ROUTING_KEY = "email.normal";
+    public static final String LOW_PRIORITY_ROUTING_KEY = "email.low";
+
+    public static final String DLX_NAME = "email.exchange.dlx";
+    public static final String URGENT_DLQ = "email.queue.urgent.dlq";
+    public static final String HIGH_DLQ = "email.queue.high.dlq";
+    public static final String NORMAL_DLQ = "email.queue.normal.dlq";
+    public static final String LOW_DLQ = "email.queue.low.dlq";
+
+    @Value("${rabbitmq.routing.key.urgent}")
+    private String urgentRoutingKey;
+
+    @Value("${rabbitmq.routing.key.high}")
+    private String highRoutingKey;
+
+    @Value("${rabbitmq.routing.key.normal}")
+    private String normalRoutingKey;
+
+    @Value("${rabbitmq.routing.key.low}")
+    private String lowRoutingKey;
 
     @Value("${spring.rabbitmq.host:localhost}")
     private String host;
@@ -36,8 +71,113 @@ public class RabbitMQReactiveConfig {
     @Value("${spring.rabbitmq.username:guest}")
     private String username;
 
-    @Value("${spring.rabbitmq.password:guest}")
+    @Value("${spring.rabbitmq.password}")
     private String password;
+
+    private final AmqpAdmin amqpAdmin;
+
+    public RabbitMQReactiveConfig(AmqpAdmin amqpAdmin) {
+        this.amqpAdmin = amqpAdmin;
+    }
+
+    @Bean
+    TopicExchange emailExchange() {
+        return new TopicExchange(EMAIL_EXCHANGE);
+    }
+
+    @Bean
+    Queue urgentPriorityQueue() {
+        return QueueBuilder.durable(URGENT_PRIORITY_QUEUE_NAME)
+                .withArgument("x-dead-letter-exchange", DLX_NAME)
+                .withArgument("x-dead-letter-routing-key", URGENT_PRIORITY_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
+    Queue highPriorityQueue() {
+        return QueueBuilder.durable(HIGH_PRIORITY_QUEUE_NAME)
+                .withArgument("x-dead-letter-exchange", DLX_NAME)
+                .withArgument("x-dead-letter-routing-key", HIGH_PRIORITY_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
+    Queue normalPriorityQueue() {
+        return QueueBuilder.durable(NORMAL_QUEUE_NAME)
+                .withArgument("x-dead-letter-exchange", DLX_NAME)
+                .withArgument("x-dead-letter-routing-key", NORMAL_PRIORITY_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
+    Queue lowPriorityQueue() {
+        return QueueBuilder.durable(LOW_PRIORITY_QUEUE_NAME)
+                .withArgument("x-dead-letter-exchange", DLX_NAME)
+                .withArgument("x-dead-letter-routing-key", LOW_PRIORITY_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
+    Queue urgentDlq() {
+        return QueueBuilder.durable(URGENT_DLQ).build();
+    }
+
+    @Bean
+    Queue highDlq() {
+        return QueueBuilder.durable(HIGH_DLQ).build();
+    }
+
+    @Bean
+    Queue normalDlq() {
+        return QueueBuilder.durable(NORMAL_DLQ).build();
+    }
+
+    @Bean
+    Queue lowDlq() {
+        return QueueBuilder.durable(LOW_DLQ).build();
+    }
+
+    /**
+     * Déclare l'exchange DLX et les 4 DLQ correspondantes.
+     */
+    @Bean
+    public Declarables dlxDeclarables() {
+        TopicExchange dlx = ExchangeBuilder.topicExchange(DLX_NAME).durable(true).build();
+
+        Queue urgentDlq = QueueBuilder.durable(URGENT_DLQ).build();
+        Queue highDlq   = QueueBuilder.durable(HIGH_DLQ).build();
+        Queue normalDlq = QueueBuilder.durable(NORMAL_DLQ).build();
+        Queue lowDlq    = QueueBuilder.durable(LOW_DLQ).build();
+
+        return new Declarables(
+                dlx,
+                urgentDlq, highDlq, normalDlq, lowDlq,
+                BindingBuilder.bind(urgentDlq).to(dlx).with(URGENT_PRIORITY_ROUTING_KEY),
+                BindingBuilder.bind(highDlq)  .to(dlx).with(HIGH_PRIORITY_ROUTING_KEY),
+                BindingBuilder.bind(normalDlq).to(dlx).with(NORMAL_PRIORITY_ROUTING_KEY),
+                BindingBuilder.bind(lowDlq)   .to(dlx).with(LOW_PRIORITY_ROUTING_KEY)
+        );
+    }
+
+    @Bean
+    Binding urgentPriorityBinding(Queue urgentPriorityQueue, TopicExchange emailExchange) {
+        return BindingBuilder.bind(urgentPriorityQueue).to(emailExchange).with(urgentRoutingKey);
+    }
+
+    @Bean
+    Binding highPriorityBinding(Queue highPriorityQueue, TopicExchange emailExchange) {
+        return BindingBuilder.bind(highPriorityQueue).to(emailExchange).with(highRoutingKey);
+    }
+
+    @Bean
+    Binding normalPriorityBinding(Queue normalPriorityQueue, TopicExchange emailExchange) {
+        return BindingBuilder.bind(normalPriorityQueue).to(emailExchange).with(normalRoutingKey);
+    }
+
+    @Bean
+    Binding lowPriorityBinding(Queue lowPriorityQueue, TopicExchange emailExchange) {
+        return BindingBuilder.bind(lowPriorityQueue).to(emailExchange).with(lowRoutingKey);
+    }
 
     /**
      * Crée une ConnectionFactory configurée pour RabbitMQ.
@@ -61,34 +201,60 @@ public class RabbitMQReactiveConfig {
     /**
      * Bean Sender réactif pour publier des messages vers RabbitMQ.
      * 
-     * Le Sender permet de publier des messages de manière non-bloquante
-     * et s'intègre parfaitement dans les chaînes réactives.
-     * 
-     * @return Sender configuré et prêt à l'emploi
+     * @return Sender configuré
      */
     @Bean
-    public Sender reactiveSender() {
+    public Sender sender() {
+        ConnectionFactory connectionFactory = createConnectionFactory();
         SenderOptions senderOptions = new SenderOptions()
-            .connectionFactory(createConnectionFactory())
+            .connectionFactory(connectionFactory)
             .resourceManagementScheduler(reactor.core.scheduler.Schedulers.boundedElastic());
-            
         return RabbitFlux.createSender(senderOptions);
     }
 
     /**
-     * Bean Receiver réactif pour consommer des messages depuis RabbitMQ.
+     * Bean Receiver réactif pour consommer des messages de RabbitMQ.
      * 
-     * Le Receiver permet de consommer des messages de manière non-bloquante
-     * sous forme de Flux réactif.
-     * 
-     * @return Receiver configuré et prêt à l'emploi
+     * @return Receiver configuré
      */
     @Bean
-    public Receiver reactiveReceiver() {
+    public Receiver receiver() {
+        ConnectionFactory connectionFactory = createConnectionFactory();
         ReceiverOptions receiverOptions = new ReceiverOptions()
-            .connectionFactory(createConnectionFactory())
+            .connectionFactory(connectionFactory)
             .connectionSubscriptionScheduler(reactor.core.scheduler.Schedulers.boundedElastic());
-            
         return RabbitFlux.createReceiver(receiverOptions);
+    }
+
+    @PostConstruct
+    public void ensureQueuesExist() {
+        log.info("🔧 Ensuring all email queues exist...");
+        
+        try {
+            // Declare all queues to ensure they exist
+            amqpAdmin.declareQueue(new Queue(URGENT_PRIORITY_QUEUE_NAME, true));
+            log.info("✅ URGENT queue ensured: {}", URGENT_PRIORITY_QUEUE_NAME);
+            
+            amqpAdmin.declareQueue(new Queue(HIGH_PRIORITY_QUEUE_NAME, true));
+            log.info("✅ HIGH queue ensured: {}", HIGH_PRIORITY_QUEUE_NAME);
+            
+            amqpAdmin.declareQueue(new Queue(NORMAL_QUEUE_NAME, true));
+            log.info("✅ NORMAL queue ensured: {}", NORMAL_QUEUE_NAME);
+            
+            amqpAdmin.declareQueue(new Queue(LOW_PRIORITY_QUEUE_NAME, true));
+            log.info("✅ LOW queue ensured: {}", LOW_PRIORITY_QUEUE_NAME);
+            
+            amqpAdmin.declareQueue(new Queue(URGENT_DLQ, true));
+            amqpAdmin.declareQueue(new Queue(HIGH_DLQ, true));
+            amqpAdmin.declareQueue(new Queue(NORMAL_DLQ, true));
+            amqpAdmin.declareQueue(new Queue(LOW_DLQ, true));
+            
+            log.info("✅ DLQs ensured");
+            
+            log.info("🎯 All email queues are ready for consumption");
+            
+        } catch (Exception e) {
+            log.error("❌ Failed to ensure queues exist", e);
+        }
     }
 }

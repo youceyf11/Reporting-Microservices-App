@@ -86,7 +86,7 @@ class EmailControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(validEmailRequest)
                 .exchange()
-                .expectStatus().isOk()
+                .expectStatus().isAccepted() // 202 ACCEPTED for async operations
                 .expectBody(EmailResponse.class)
                 .value(response -> {
                     assert response.getEmailId().equals("test-email-id");
@@ -150,7 +150,7 @@ class EmailControllerTest {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .bodyValue(chartData)
                 .exchange()
-                .expectStatus().isOk()
+                .expectStatus().isAccepted() // 202 ACCEPTED for async chart email
                 .expectBody(EmailResponse.class);
 
         verify(emailService).processEmailRequest(any(EmailRequest.class));

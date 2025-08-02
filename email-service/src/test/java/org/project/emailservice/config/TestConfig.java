@@ -6,6 +6,7 @@ import org.project.emailservice.entity.EmailLog;
 import org.project.emailservice.service.ProviderService;
 import org.project.emailservice.service.QueueService;
 import org.project.emailservice.service.TemplateService;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -13,6 +14,7 @@ import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.core.ReactiveValueOperations;
 import org.springframework.mail.javamail.JavaMailSender;
 import reactor.core.publisher.Mono;
+import reactor.rabbitmq.Sender;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -46,8 +48,14 @@ public class TestConfig {
 
     @Bean
     @Primary
-    public QueueService queueService() {
-        return Mockito.mock(QueueService.class, Mockito.withSettings().lenient());
+    public RabbitTemplate rabbitTemplate() {
+        return Mockito.mock(RabbitTemplate.class);
+    }
+
+    @Bean
+    @Primary
+    public Sender sender() {
+        return Mockito.mock(Sender.class);
     }
 
     @Bean
@@ -59,6 +67,15 @@ public class TestConfig {
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOps);
         lenient().when(valueOps.set(anyString(), any(EmailLog.class))).thenReturn(Mono.just(true));
         lenient().when(valueOps.get(anyString())).thenReturn(Mono.empty());
+        return redisTemplate;
+    }
+
+    @Bean
+    @Primary
+    public ReactiveRedisTemplate<String, Object> reactiveRedisTemplateObject() {
+        ReactiveRedisTemplate<String, Object> redisTemplate = Mockito.mock(ReactiveRedisTemplate.class);
+        ReactiveValueOperations<String, Object> valueOperations = Mockito.mock(ReactiveValueOperations.class);
+        Mockito.when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         return redisTemplate;
     }
 

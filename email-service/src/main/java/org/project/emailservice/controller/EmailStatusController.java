@@ -26,7 +26,7 @@ public class EmailStatusController {
         .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
     }
     
-    @PostMapping("/bulk")
+    @PostMapping("/bulk")  
     public Flux<EmailResponse> getBulkEmailStatus(@RequestBody List<String> emailIds) {
         return emailService.getBulkEmailStatus(emailIds);
     }

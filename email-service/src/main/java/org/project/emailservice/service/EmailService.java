@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import org.project.emailservice.enums.EmailPriority;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -26,17 +27,27 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class EmailService {
 
-    private final ReactiveRedisTemplate<String, Object> redisTemplate;
+    private final ReactiveRedisTemplate<String, EmailLog> redisTemplate;
     private final QueueService queueService;
     private final TemplateService templateService;
     private final ObjectMapper objectMapper;
 
     public Mono<EmailResponse> processEmailRequest(EmailRequest request) {
         String emailId = UUID.randomUUID().toString();
-        EmailLog emailLog = new EmailLog(emailId, request.getTo(), EmailStatus.QUEUED);
+        EmailLog emailLog = EmailLog.builder()
+                .id(emailId)
+                .to(request.getTo())
+                .from(request.getFrom())
+                .subject(request.getSubject())
+                .status(EmailStatus.QUEUED)
+                .priority(request.getPriority() != null ? request.getPriority() : EmailPriority.NORMAL)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .metadata(request.getMetadata())
+                .build();
 
         return redisTemplate.opsForValue().set("email:" + emailId, emailLog)
-            .then(Mono.fromRunnable(() -> queueService.queueEmail(request, emailId)))
+            .then(queueService.queueEmail(request, emailId))
             .thenReturn(buildEmailResponse(emailLog));
     }
 
@@ -92,27 +103,32 @@ public class EmailService {
     }
 
     public Mono<Void> updateEmailStatus(String emailId, EmailStatus status, String errorMessage) {
-        return getEmailStatus(emailId)
+        return redisTemplate.opsForValue().get("email:" + emailId)
                 .flatMap(emailLog -> {
+                    if (emailLog == null) {
+                        return Mono.error(new RuntimeException("EmailLog not found for id: " + emailId));
+                    }
                     emailLog.setStatus(status);
                     emailLog.setUpdatedAt(Instant.now());
                     if (errorMessage != null) {
                         emailLog.setErrorMessage(errorMessage);
                     }
-                    return redisTemplate.opsForValue().set("email:" + emailId, emailLog, Duration.ofHours(24)).then();
+                    return redisTemplate.opsForValue().set("email:" + emailId, emailLog, Duration.ofHours(24));
                 })
                 .then();
     }
 
     public EmailResponse buildEmailResponse(EmailLog emailLog) {
-        return new EmailResponse(
-            emailLog.getId(),
-            emailLog.getStatus(),
-            emailLog.getErrorMessage(),
-            emailLog.getPriority() != null ? emailLog.getPriority().name() : null,
-            emailLog.getCreatedAt(),
-            emailLog.getUpdatedAt()
-        );
+        return EmailResponse.builder()
+                .emailId(emailLog.getId())
+                .status(emailLog.getStatus())
+                .errorMessage(emailLog.getErrorMessage())
+                .priority(emailLog.getPriority() != null ? emailLog.getPriority().name() : null)
+                .createdAt(emailLog.getCreatedAt())
+                .updatedAt(emailLog.getUpdatedAt())
+                .processedAt(emailLog.getProcessedAt())
+                .metadata(emailLog.getMetadata() != null ? Map.copyOf(emailLog.getMetadata()) : null)
+                .build();
     }
 
     public EmailResponse buildNotFoundResponse(String emailId) {
