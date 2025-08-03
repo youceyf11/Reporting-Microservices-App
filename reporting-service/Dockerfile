@@ -1,12 +1,13 @@
-# Étape 1 : Utiliser une image Java officielle
-FROM eclipse-temurin:21-jre
-
-# Étape 2 : Définir le répertoire de travail
+# ── Étape build ──
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
+COPY . .
+RUN mvn -q -pl :reporting-service -am -DskipTests package \
+    && cp reporting-service/target/*-SNAPSHOT.jar app.jar
 
-# Étape 3 : Copier le JAR
-COPY target/reporting-service-0.0.1-SNAPSHOT.jar app.jar
-
-
-# Étape 5 : Lancer l'application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+COPY --from=build /app/app.jar app.jar
+# ── Étape runtime ──
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /app/reporting-service/target/*.jar app.jar
+ENTRYPOINT ["java","-jar","app.jar"]

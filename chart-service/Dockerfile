@@ -1,12 +1,12 @@
-# Use Eclipse Temurin JRE 21 as the base image
-FROM eclipse-temurin:21-jre
-
-# Set the working directory
+# ── Étape build ──
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
+COPY . .
+RUN mvn -q -pl :chart-service -am -DskipTests package \
+    && cp chart-service/target/*-SNAPSHOT.jar app.jar
 
-
-COPY target/chart-service-0.0.1-SNAPSHOT.jar app.jar
-
-
-# Run the application
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+# ── Étape runtime ──
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /app/app.jar app.jar
+ENTRYPOINT ["java","-jar","app.jar"]
