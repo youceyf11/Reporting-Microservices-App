@@ -20,6 +20,9 @@ import lombok.extern.slf4j.Slf4j;
 import jakarta.annotation.PostConstruct;
 import org.springframework.amqp.core.AmqpAdmin;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Configuration pour RabbitMQ réactif.
  * 
@@ -111,10 +114,11 @@ public class RabbitMQReactiveConfig {
 
     @Bean
     Queue lowPriorityQueue() {
-        return QueueBuilder.durable(LOW_PRIORITY_QUEUE_NAME)
-                .withArgument("x-dead-letter-exchange", DLX_NAME)
-                .withArgument("x-dead-letter-routing-key", LOW_PRIORITY_ROUTING_KEY)
-                .build();
+        Map<String, Object> lowArgs = new HashMap<>();
+        lowArgs.put("x-dead-letter-exchange", DLX_NAME);
+        lowArgs.put("x-dead-letter-routing-key", LOW_PRIORITY_ROUTING_KEY);
+        lowArgs.put("x-message-ttl", 5000);
+        return QueueBuilder.durable(LOW_PRIORITY_QUEUE_NAME).withArguments(lowArgs).build();
     }
 
     @Bean
@@ -228,33 +232,57 @@ public class RabbitMQReactiveConfig {
 
     @PostConstruct
     public void ensureQueuesExist() {
-        log.info("🔧 Ensuring all email queues exist...");
+        log.info("🔧 Ensuring email exchange and all queues exist...");
         
         try {
-            // Declare all queues to ensure they exist
+            // Declare exchange first
+            amqpAdmin.declareExchange(new TopicExchange(EMAIL_EXCHANGE));
+            TopicExchange emailExchange = new TopicExchange(EMAIL_EXCHANGE);
+            log.info("✅ Email exchange ensured: {}", EMAIL_EXCHANGE);
+
+            // Declare all priority queues
             amqpAdmin.declareQueue(new Queue(URGENT_PRIORITY_QUEUE_NAME, true));
             log.info("✅ URGENT queue ensured: {}", URGENT_PRIORITY_QUEUE_NAME);
-            
+
             amqpAdmin.declareQueue(new Queue(HIGH_PRIORITY_QUEUE_NAME, true));
             log.info("✅ HIGH queue ensured: {}", HIGH_PRIORITY_QUEUE_NAME);
-            
+
             amqpAdmin.declareQueue(new Queue(NORMAL_QUEUE_NAME, true));
             log.info("✅ NORMAL queue ensured: {}", NORMAL_QUEUE_NAME);
-            
-            amqpAdmin.declareQueue(new Queue(LOW_PRIORITY_QUEUE_NAME, true));
+
+            // LOW priority queue with TTL (5 seconds) and DLX
+            Map<String, Object> lowArgs = new HashMap<>();
+            lowArgs.put("x-dead-letter-exchange", DLX_NAME);
+            lowArgs.put("x-dead-letter-routing-key", LOW_PRIORITY_ROUTING_KEY);
+            lowArgs.put("x-message-ttl", 5000);
+            amqpAdmin.declareQueue(new Queue(LOW_PRIORITY_QUEUE_NAME, true, false, false, lowArgs));
             log.info("✅ LOW queue ensured: {}", LOW_PRIORITY_QUEUE_NAME);
-            
+
+            // Declare DLX and DLQ queues
+            amqpAdmin.declareExchange(new TopicExchange(DLX_NAME));
             amqpAdmin.declareQueue(new Queue(URGENT_DLQ, true));
             amqpAdmin.declareQueue(new Queue(HIGH_DLQ, true));
             amqpAdmin.declareQueue(new Queue(NORMAL_DLQ, true));
             amqpAdmin.declareQueue(new Queue(LOW_DLQ, true));
-            
-            log.info("✅ DLQs ensured");
-            
-            log.info("🎯 All email queues are ready for consumption");
+            log.info("✅ DLX and DLQs ensured");
+
+            // Bind priority queues to email exchange
+            amqpAdmin.declareBinding(BindingBuilder.bind(new Queue(URGENT_PRIORITY_QUEUE_NAME, true)).to(emailExchange).with("email.urgent"));
+            amqpAdmin.declareBinding(BindingBuilder.bind(new Queue(HIGH_PRIORITY_QUEUE_NAME, true)).to(emailExchange).with("email.high"));
+            amqpAdmin.declareBinding(BindingBuilder.bind(new Queue(NORMAL_QUEUE_NAME, true)).to(emailExchange).with("email.normal"));
+            amqpAdmin.declareBinding(BindingBuilder.bind(new Queue(LOW_PRIORITY_QUEUE_NAME, true)).to(emailExchange).with("email.low"));
+            log.info("✅ Priority queues bound to exchange");
+
+            // Bind DLQ queues to DLX so that dead-lettered messages are routed correctly
+            amqpAdmin.declareBinding(BindingBuilder.bind(new Queue(URGENT_DLQ, true)).to(new TopicExchange(DLX_NAME)).with(URGENT_PRIORITY_ROUTING_KEY));
+            amqpAdmin.declareBinding(BindingBuilder.bind(new Queue(HIGH_DLQ, true)).to(new TopicExchange(DLX_NAME)).with(HIGH_PRIORITY_ROUTING_KEY));
+            amqpAdmin.declareBinding(BindingBuilder.bind(new Queue(NORMAL_DLQ, true)).to(new TopicExchange(DLX_NAME)).with(NORMAL_PRIORITY_ROUTING_KEY));
+            amqpAdmin.declareBinding(BindingBuilder.bind(new Queue(LOW_DLQ, true)).to(new TopicExchange(DLX_NAME)).with(LOW_PRIORITY_ROUTING_KEY));
+
+            log.info("🎯 Email exchange, queues, bindings and DLQs are ready for consumption");
             
         } catch (Exception e) {
-            log.error("❌ Failed to ensure queues exist", e);
+            log.error("❌ Failed to ensure exchange/queues exist", e);
         }
     }
 }

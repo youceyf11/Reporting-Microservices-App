@@ -47,6 +47,21 @@ public class QueueService {
         this.rabbitTemplate = rabbitTemplate;
         this.sender = sender;
         this.objectMapper = objectMapper;
+
+        // Enable mandatory flag so unroutable messages are returned
+        this.rabbitTemplate.setMandatory(true);
+        this.rabbitTemplate.setReturnsCallback(returned -> {
+            log.error("Message returned by broker. ReplyCode={} replyText={} exchange={} routingKey={}",
+                    returned.getReplyCode(), returned.getReplyText(), returned.getExchange(), returned.getRoutingKey());
+        });
+        this.rabbitTemplate.setConfirmCallback((correlation, ack, cause) -> {
+            if (ack) {
+                log.debug("Broker ACK for correlationData={} ", correlation);
+            } else {
+                log.error("Broker NACK for correlationData={} cause={}", correlation, cause);
+            }
+        });
+        this.rabbitTemplate.setChannelTransacted(false);
     }
      
 

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.project.emailservice.config.RabbitMQReactiveConfig;
 import org.project.emailservice.dto.EmailMessagePayload;
+import org.project.emailservice.enums.EmailStatus;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -104,10 +105,21 @@ public class EmailMessageConsumer {
                 return Mono.<Void>empty();
             }
             
-            log.info("Processing email request from queue for ID: {}", payload.getEmailId());
+            log.info("Processing email request from queue for ID: {} using routingKey: {}", payload.getEmailId(), payload.getRoutingKey());
             return providerService.sendEmail(payload.getRequest())
-                    .doOnSuccess(mId -> log.info("Successfully sent email for ID: {}", payload.getEmailId()))
-                    .doOnError(e -> log.error("Failed to send email for ID: {}", payload.getEmailId(), e))
+                    .flatMap(msgId -> {
+                        // Mark as SENT in Redis
+                        return emailService.updateEmailStatus(payload.getEmailId(), EmailStatus.SENT, null)
+                                .thenReturn(msgId);
+                    })
+                    .doOnSubscribe(s -> log.debug("Invoking ProviderService for emailId={}", payload.getEmailId()))
+                    .doOnSuccess(mId -> log.info("Successfully sent email for ID: {} , provider messageId={}", payload.getEmailId(), mId))
+                    .onErrorResume(e -> {
+                        log.error("ProviderService failed for emailId={}", payload.getEmailId(), e);
+                        // Mark as FAILED in Redis
+                        return emailService.updateEmailStatus(payload.getEmailId(), EmailStatus.FAILED, e.getMessage())
+                                .then(Mono.error(e));
+                    })
                     .then();
         });
     }
@@ -116,16 +128,15 @@ public class EmailMessageConsumer {
      * Traite le delivery et gère les ACK/NACK.
      */
     private Mono<Void> handleDelivery(AcknowledgableDelivery delivery) {
+        log.debug("Received delivery: tag={} routingKey={} size={} bytes", delivery.getEnvelope().getDeliveryTag(), delivery.getEnvelope().getRoutingKey(), delivery.getBody().length);
         return processMessage(delivery.getBody())
                 .doOnSuccess(v -> {
-                    // Processing succeeded, ACK the message
+                    log.debug("ACKing message tag={}", delivery.getEnvelope().getDeliveryTag());
                     delivery.ack();
                 })
-                .onErrorResume(e -> {
-                    // An error occurred -> NACK (requeue=false) to route to DLQ and swallow error to keep the stream alive
-                    log.error("Processing failed, NACKing message to DLQ", e);
-                    delivery.nack(false);
-                    return Mono.empty();
+                .doOnError(e -> {
+                    log.error("Error while processing delivery tag={}", delivery.getEnvelope().getDeliveryTag(), e);
+                    delivery.nack(true);
                 });
     }
 
