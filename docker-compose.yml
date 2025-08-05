@@ -11,6 +11,11 @@ services:
       - JIRA_USERNAME=${JIRA_USERNAME}
       - JIRA_API_TOKEN=${JIRA_API_TOKEN}
       - JIRA_FETCH_SERVICE_PORT=${JIRA_FETCH_SERVICE_PORT}
+      - SPRING_R2DBC_URL=${SPRING_R2DBC_URL}
+      - SPRING_R2DBC_USERNAME=${SPRING_R2DBC_USERNAME}
+      - SPRING_R2DBC_PASSWORD=${SPRING_R2DBC_PASSWORD}
+    depends_on:
+      - postgres
 
 
   reporting-service:
@@ -40,8 +45,8 @@ services:
     
   email-service:
     build: 
-      context: .
-      dockerfile: email-service/Dockerfile
+      context: ./email-service
+      dockerfile: Dockerfile
     ports:
       - "${EMAIL_SERVICE_PORT}:8084"
     depends_on:
@@ -54,6 +59,24 @@ services:
       - SPRING_DATA_REDIS_PORT=6379
       - GMAIL_USERNAME=${GMAIL_USERNAME}
       - GMAIL_PASSWORD=${GMAIL_PASSWORD}
+
+  excel-service:
+    build:
+      context: ./excel-service
+      dockerfile: Dockerfile
+    ports:
+      - "${EXCEL_SERVICE_PORT}:8085"
+    environment:
+      - SPRING_R2DBC_URL=${SPRING_R2DBC_URL}
+      - SPRING_R2DBC_USERNAME=${SPRING_R2DBC_USERNAME}
+      - SPRING_R2DBC_PASSWORD=${SPRING_R2DBC_PASSWORD}
+      - EXCEL_REPORTS_DIR=/data/reports
+      - EXCEL_CHECKPOINT_DIR=/data/checkpoints
+    env_file: .env 
+    volumes:
+      - /Users/youssefouriniche/Desktop/reports:/data
+    depends_on:
+      - postgres
 
   redis:
     image: redis:7-alpine
@@ -68,3 +91,18 @@ services:
     environment:
       - RABBITMQ_DEFAULT_USER=guest
       - RABBITMQ_DEFAULT_PASS=guest
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=jira_db
+      - POSTGRES_USER=jira
+      - POSTGRES_PASSWORD=secret
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

@@ -110,6 +110,7 @@ public interface JiraMapper {
     @Mapping(source = "issueKey", target = "id")
     @Mapping(source = "issueKey", target = "issueKey")
     @Mapping(source = "issueKey", target = "projectKey", qualifiedByName = "extractProjectKey")
+    @Mapping(target = "newEntity", ignore = true) // conserve la valeur par défaut true
     @Mapping(source = "created", target = "created", qualifiedByName = "formatDateForDb")
     @Mapping(source = "updated", target = "updated", qualifiedByName = "formatDateForDb")
     @Mapping(source = "resolved", target = "resolved", qualifiedByName = "formatDateForDb")

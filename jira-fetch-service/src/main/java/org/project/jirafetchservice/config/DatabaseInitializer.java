@@ -33,7 +33,7 @@ public class DatabaseInitializer implements CommandLineRunner {
                 created VARCHAR(255),
                 updated VARCHAR(255),
                 resolved VARCHAR(255),
-                time_spent_seconds BIGInteger,
+                time_spent_seconds BIGINT,
                 organization VARCHAR(255),
                 classification VARCHAR(255),
                 entity VARCHAR(255),
@@ -61,6 +61,9 @@ public class DatabaseInitializer implements CommandLineRunner {
                             .then())
                     .then(r2dbcEntityTemplate.getDatabaseClient()
                             .sql("CREATE INDEX IF NOT EXISTS idx_jira_issue_assignee ON jira_issue(assignee)")
+                            .then())
+                    .then(r2dbcEntityTemplate.getDatabaseClient()
+                            .sql("CREATE VIEW IF NOT EXISTS issue AS SELECT * FROM jira_issue")
                             .then())
                     .block();
 

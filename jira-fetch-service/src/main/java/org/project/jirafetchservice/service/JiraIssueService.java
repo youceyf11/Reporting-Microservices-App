@@ -120,7 +120,15 @@ public class JiraIssueService {
                                         .map(jiraMapper::toDbEntityFromSimpleDto)
                                         .toList();
 
-                                return jiraIssueRepository.saveAll(entities)
+                                return Flux.fromIterable(entities)
+                                        .flatMap(entity -> jiraIssueRepository.save(entity)
+                                                .onErrorResume(org.springframework.dao.DataAccessException.class, dup -> {
+                                                    // Mark as existing and retry update
+                                                    entity.setNewEntity(false);
+                                                    System.out.println("[WARN] Duplicate key detected for " + entity.getId() + " – performing update.");
+                                                    return jiraIssueRepository.save(entity)
+                                                            .onErrorResume(e -> Mono.empty());
+                                                }))
                                         .map(jiraMapper::toSimpleDtoFromDb)
                                         .doOnNext(saved -> {
                                             Integer count = processedCount.incrementAndGet();
