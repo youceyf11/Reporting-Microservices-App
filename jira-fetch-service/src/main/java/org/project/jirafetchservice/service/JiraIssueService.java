@@ -120,15 +120,17 @@ public class JiraIssueService {
                                         .map(jiraMapper::toDbEntityFromSimpleDto)
                                         .toList();
 
-                                return Flux.fromIterable(entities)
-                                        .flatMap(entity -> jiraIssueRepository.save(entity)
-                                                .onErrorResume(org.springframework.dao.DataAccessException.class, dup -> {
-                                                    // Mark as existing and retry update
-                                                    entity.setNewEntity(false);
-                                                    System.out.println("[WARN] Duplicate key detected for " + entity.getId() + " – performing update.");
-                                                    return jiraIssueRepository.save(entity)
-                                                            .onErrorResume(e -> Mono.empty());
-                                                }))
+                                return jiraIssueRepository.saveAll(entities)
+                                        .onErrorResume(org.springframework.dao.DataIntegrityViolationException.class, ex -> {
+                                            // Handle constraint violations by trying individual saves
+                                            return Flux.fromIterable(entities)
+                                                    .flatMap(entity -> jiraIssueRepository.save(entity)
+                                                            .onErrorResume(constraintEx -> {
+                                                                // Log the error instead of silently ignoring
+                                                                System.err.println("Failed to save entity " + entity.getId() + ": " + constraintEx.getMessage());
+                                                                return Mono.empty();
+                                                            }));
+                                        })
                                         .map(jiraMapper::toSimpleDtoFromDb)
                                         .doOnNext(saved -> {
                                             Integer count = processedCount.incrementAndGet();
