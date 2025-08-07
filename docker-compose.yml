@@ -27,6 +27,7 @@ services:
     environment:
       - REPORTING_SERVICE_PORT=${REPORTING_SERVICE_PORT}
       - JIRA_FETCH_BASE_URL=${JIRA_FETCH_BASE_URL}
+      - SPRING_PROFILES_ACTIVE=testdata
     depends_on:
       - jira-fetch-service
 
@@ -70,11 +71,11 @@ services:
       - SPRING_R2DBC_URL=${SPRING_R2DBC_URL}
       - SPRING_R2DBC_USERNAME=${SPRING_R2DBC_USERNAME}
       - SPRING_R2DBC_PASSWORD=${SPRING_R2DBC_PASSWORD}
-      - EXCEL_REPORTS_DIR=/data/reports
-      - EXCEL_CHECKPOINT_DIR=/data/checkpoints
+      - EXCEL_REPORTS_DIR=/data
+      - EXCEL_CHECKPOINT_DIR=/data
     env_file: .env 
     volumes:
-      - /Users/youssefouriniche/Desktop/reports:/data
+      - /Users/youssefouriniche/Desktop/reportsExcel:/data
     depends_on:
       - postgres
 
@@ -103,6 +104,8 @@ services:
       - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jira"]
 
 volumes:
   postgres_data:

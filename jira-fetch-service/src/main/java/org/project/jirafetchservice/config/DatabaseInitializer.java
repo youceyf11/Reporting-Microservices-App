@@ -63,7 +63,7 @@ public class DatabaseInitializer implements CommandLineRunner {
                             .sql("CREATE INDEX IF NOT EXISTS idx_jira_issue_assignee ON jira_issue(assignee)")
                             .then())
                     .then(r2dbcEntityTemplate.getDatabaseClient()
-                            .sql("CREATE VIEW IF NOT EXISTS issue AS SELECT * FROM jira_issue")
+                            .sql("CREATE OR REPLACE VIEW issue AS SELECT * FROM jira_issue")
                             .then())
                     .block();
 

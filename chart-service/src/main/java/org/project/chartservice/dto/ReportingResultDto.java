@@ -9,11 +9,12 @@ import java.util.List;
 @Getter
 @Setter
 public class ReportingResultDto {
-    @JsonProperty("employees")
+    // Map to 'employeeRankings' field from reporting-service JSON
+    @JsonProperty("employeeRankings")
     private List<EmployeePerformanceDto> employees;
-    
+
     public ReportingResultDto() {}
-    
+
     public ReportingResultDto(List<EmployeePerformanceDto> employees) {
         this.employees = employees;
     }

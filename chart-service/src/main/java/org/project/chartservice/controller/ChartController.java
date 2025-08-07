@@ -1,6 +1,5 @@
 package org.project.chartservice.controller;
 
-import org.project.chartservice.dto.EmployeePerformanceDto;
 import org.project.chartservice.enums.ChartType;
 import org.project.chartservice.service.ChartService;
 import org.springframework.beans.factory.annotation.Autowired;

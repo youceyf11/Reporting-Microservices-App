@@ -3,6 +3,7 @@ package org.project.reportingservice.service;
 import org.project.reportingservice.dto.IssueSimpleDto;
 import org.project.reportingservice.iservice.IJiraClient;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -10,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import reactor.core.publisher.Flux;
 
 @Service
+@Profile("!testdata")
 public class JiraClient implements IJiraClient {
 
     private final WebClient jiraFetchWebClient;
