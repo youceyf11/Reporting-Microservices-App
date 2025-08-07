@@ -40,15 +40,15 @@ INSERT INTO jira_issue VALUES
 -- SCRUM : toujours ouvert
 INSERT INTO jira_issue VALUES
   ('ID-2', 'SCRUM-2', 'SCRUM', NULL, 'Add “remember me”', 'Story',
-   'In Progress', 'Low', NULL, 'charles', 'charles@corp', 'david', 'david@corp',
-   '2025-08-10', '2025-08-12', NULL, 0,
-   'Logistics', 'Level-2', 'Web', 'WIP', 'Chat', NULL,
+   'In Progress', 'Low', 'WIP', 'charles', 'charles@corp', 'david', 'david@corp',
+   '2025-08-10', '2025-08-12', '2025-08-15', 36000,
+   'Logistics', 'Level-2', 'Web', 'WIP', 'Chat', 2.0,
    'LKS', '08/2025', 'Quota');
 
 -- DEVOPS : autre projet, autre mois
 INSERT INTO jira_issue VALUES
   ('ID-3', 'DEV-1', 'DEVOPS', NULL, 'K8s upgrade', 'Task',
    'Closed', 'Medium', 'Done', 'eve', 'eve@corp', 'frank', 'frank@corp',
-   '2025-06-15', '2025-06-20', '2025-06-25', 18000,
+   '2025-06-15', '2025-08-20', '2025-08-25', 36000,
    'Infrastructure', 'Level-1', 'Backend', 'Valid', 'Email', 10.2,
-   'LHR', '06/2025', 'Ops');
+   'LHR', '08/2025', 'Ops');
