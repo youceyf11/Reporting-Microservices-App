@@ -20,11 +20,9 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -60,7 +58,7 @@ class JiraIssueServiceTest {
                 .build();
                 
         dbEntity = new JiraIssueDbEntity("PROJ-123");
-        dbEntity.setUpdated(LocalDateTime.now().minusMinutes(30).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
+        dbEntity.setUpdated(LocalDateTime.now().minusMinutes(30));
         
         searchResponse = new JiraSearchResponse();
         searchResponse.setIssues(Arrays.asList(apiResponse));
@@ -126,8 +124,7 @@ class JiraIssueServiceTest {
     void synchroniserIssueAvecJira_shouldReturnCachedWhenRecent() {
         // Setup recent entity (30 minutes ago)
         JiraIssueDbEntity recentEntity = new JiraIssueDbEntity("PROJ-123");
-        String recentTime = LocalDateTime.now().minusMinutes(30).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
-        recentEntity.setUpdated(recentTime);
+        recentEntity.setUpdated(LocalDateTime.now().minusMinutes(30));
 
         when(jiraIssueRepository.findByIssueKey("PROJ-123")).thenReturn(Flux.just(recentEntity));
         when(jiraMapper.toSimpleDtoFromDb(recentEntity)).thenReturn(simpleDto);
@@ -162,8 +159,7 @@ class JiraIssueServiceTest {
     void synchroniserIssueAvecJira_shouldFetchFromJiraWhenOld() {
         // Setup old entity (2 hours ago)
         JiraIssueDbEntity oldEntity = new JiraIssueDbEntity("PROJ-123");
-        String oldTime = LocalDateTime.now().minusHours(2).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
-        oldEntity.setUpdated(oldTime);
+        oldEntity.setUpdated(LocalDateTime.now().minusHours(2));
 
         when(jiraIssueRepository.findByIssueKey("PROJ-123")).thenReturn(Flux.just(oldEntity));
         when(jiraWebClient.getIssue("PROJ-123")).thenReturn(Mono.just(apiResponse));
@@ -288,8 +284,7 @@ class JiraIssueServiceTest {
     void synchroniserIssueAvecJira_shouldHandleConcurrentRequests() {
         // Setup old entity to force Jira fetch
         JiraIssueDbEntity oldEntity = new JiraIssueDbEntity("PROJ-123");
-        String oldTime = LocalDateTime.now().minusHours(2).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
-        oldEntity.setUpdated(oldTime);
+        oldEntity.setUpdated(LocalDateTime.now().minusHours(2));
         
         when(jiraIssueRepository.findByIssueKey("PROJ-123")).thenReturn(Flux.just(oldEntity));
         when(jiraWebClient.getIssue("PROJ-123")).thenReturn(Mono.just(apiResponse));
@@ -309,10 +304,10 @@ class JiraIssueServiceTest {
     @DisplayName("isRecentlyUpdatedInJira - Should handle various timestamp formats")
     void isRecentlyUpdatedInJira_shouldHandleVariousFormats() {
         JiraIssueDbEntity entityWithIsoFormat = new JiraIssueDbEntity("PROJ-1");
-        entityWithIsoFormat.setUpdated("2025-01-01T10:00:00.123Z");
+        entityWithIsoFormat.setUpdated(LocalDateTime.parse("2025-01-01T10:00:00.123"));
 
         JiraIssueDbEntity entityWithSimpleFormat = new JiraIssueDbEntity("PROJ-2");
-        entityWithSimpleFormat.setUpdated(LocalDateTime.now().minusMinutes(30).toString());
+        entityWithSimpleFormat.setUpdated(LocalDateTime.now().minusMinutes(30));
 
         when(jiraIssueRepository.findByIssueKey("PROJ-1")).thenReturn(Flux.just(entityWithIsoFormat));
         when(jiraIssueRepository.findByIssueKey("PROJ-2")).thenReturn(Flux.just(entityWithSimpleFormat));

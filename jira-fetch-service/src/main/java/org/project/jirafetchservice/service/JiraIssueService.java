@@ -11,7 +11,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -58,13 +57,13 @@ public class JiraIssueService {
     public Mono<IssueSimpleDto> synchroniserIssueAvecJira(String issueKey) {
         return jiraIssueRepository.findByIssueKey(issueKey)
                 .next()
-                .flatMap(existingEntity -> {
-                    System.out.println("DEBUG: Found existing entity for " + issueKey + ", updated=" + existingEntity.getUpdated());
-                    if (existingEntity.getUpdated() != null &&
-                            isRecentlyUpdatedInJira(existingEntity.getUpdated())) {
+                .flatMap(entity -> {
+                    System.out.println("DEBUG: Found existing entity for " + issueKey + ", updated=" + entity.getUpdated());
+                    if (entity.getUpdated() != null &&
+                    isRecentlyUpdatedInJira(entity.getUpdated())) {
                         System.out.println("DEBUG: Using cached data for " + issueKey);
                         try {
-                            IssueSimpleDto dto = jiraMapper.toSimpleDtoFromDb(existingEntity);
+                            IssueSimpleDto dto = jiraMapper.toSimpleDtoFromDb(entity);
                             System.out.println("DEBUG: Mapper returned DTO: " + (dto != null ? dto.getIssueKey() : "NULL"));
                             return Mono.just(dto);
                         } catch (Exception e) {
@@ -178,29 +177,16 @@ public class JiraIssueService {
                 .doOnError(error -> System.err.println("Erreur lors de la synchronisation de recherche: " + error.getMessage()));
     }
 
-    // Méthode utilitaire pour vérifier si une issue Jira est récente
-    private boolean isRecentlyUpdatedInJira(String updatedStr) {
-        try {
-            LocalDateTime updated;
-            if (updatedStr.contains("T") && updatedStr.contains(":")) {
-                // Format ISO datetime
-                updated = LocalDateTime.parse(
-                    updatedStr.substring(0, 19),
-                    DateTimeFormatter.ISO_LOCAL_DATE_TIME
-                );
-            } else {
-                // Assume it's already parsed
-                updated = LocalDateTime.parse(updatedStr);
-            }
-            LocalDateTime threshold = LocalDateTime.now().minusHours(1);
-            boolean isRecent = updated.isAfter(threshold);
-            System.out.println("DEBUG isRecentlyUpdatedInJira: updated=" + updated + ", threshold=" + threshold + ", isRecent=" + isRecent);
-            return isRecent;
-        } catch (Exception e) {
-            System.err.println("Erreur lors du parsing de la date: " + updatedStr + " - " + e.getMessage());
-            e.printStackTrace();
+
+    // Overloaded method for LocalDateTime objects (from database)
+    private boolean isRecentlyUpdatedInJira(LocalDateTime updated) {
+        if (updated == null) {
             return false;
         }
+        LocalDateTime threshold = LocalDateTime.now().minusHours(1);
+        boolean isRecent = updated.isAfter(threshold);
+        System.out.println("DEBUG isRecentlyUpdatedInJira: updated=" + updated + ", threshold=" + threshold + ", isRecent=" + isRecent);
+        return isRecent;
     }
 
     // Filtre les issues qui ne nécessitent pas de mise à jour

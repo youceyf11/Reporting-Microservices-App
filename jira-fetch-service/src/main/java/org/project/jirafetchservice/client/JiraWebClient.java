@@ -6,10 +6,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import org.springframework.beans.factory.annotation.Qualifier;
 
 /**
- * Client for Integereracting with the Jira REST API.
+ * Client for Interacting with the Jira REST API.
  * This client provides methods to fetch issues and search for issues using JQL.
  */
 @Component //indique à Spring que la classe annotée doit être détectée automatiquement et enregistrée comme un bean dans le contexte d’application
@@ -17,7 +16,8 @@ public class JiraWebClient {
 
     private final WebClient webClient;
 
-    public JiraWebClient(@Qualifier("jiraApiWebClient") WebClient webClient) {
+    // Test-friendly constructor without @Qualifier for unit testing
+    public JiraWebClient(WebClient webClient) {
         this.webClient = webClient;
     }
 
