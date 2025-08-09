@@ -72,6 +72,30 @@ public interface JiraMapper {
     }
 
     // API → DTO complet
+    @Mapping(source = "fields.summary", target = "summary")
+    @Mapping(source = "key", target = "issueKey")
+    @Mapping(source = "fields.issuetype.name", target = "issueType")
+    @Mapping(source = "fields.status.name", target = "status")
+    @Mapping(source = "fields.priority.name", target = "priority")
+    @Mapping(source = "fields.resolution.name", target = "resolution")
+    @Mapping(source = "fields.assignee.displayName", target = "assignee")
+    @Mapping(source = "fields.assignee.emailAddress", target = "assigneeEmail")
+    @Mapping(source = "fields.reporter.displayName", target = "reporter")
+    @Mapping(source = "fields.reporter.emailAddress", target = "reporterEmail")
+    @Mapping(source = "fields.organization", target = "organization")
+    @Mapping(source = "fields.created", target = "created")
+    @Mapping(source = "fields.updated", target = "updated")
+    @Mapping(source = "fields.resolved", target = "resolved")
+    @Mapping(source = "fields.timeSpentSeconds", target = "timeSpentSeconds")
+    @Mapping(source = "fields.classification", target = "classification")
+    @Mapping(source = "fields.entity", target = "entity")
+    @Mapping(source = "fields.issueQuality", target = "issueQuality")
+    @Mapping(source = "fields.medium", target = "medium")
+    @Mapping(source = "fields.ttsDays", target = "ttsDays")
+    @Mapping(source = "fields.site", target = "site")
+    @Mapping(source = "fields.month", target = "month")
+    @Mapping(source = "fields.quotaPerProject", target = "quotaPerProject")
+    @Mapping(source = "self", target = "self")
     JiraIssueDto toJiraIssueDto(JiraIssueApiResponse apiResponse);
 
     // API → Entité DB
@@ -100,10 +124,12 @@ public interface JiraMapper {
     @Mapping(source = "fields.site", target = "site")
     @Mapping(source = "fields.month", target = "issueMonth")
     @Mapping(source = "fields.quotaPerProject", target = "quotaPerProject")
+    @Mapping(target = "newEntity", ignore = true) 
     @Mapping(source = "self", target = "selfUrl")
     JiraIssueDbEntity toDbEntityFromApi(JiraIssueApiResponse apiResponse);
 
     // Entité DB → DTO simple
+    @Mapping(source = "issueMonth", target = "month")
     IssueSimpleDto toSimpleDtoFromDb(JiraIssueDbEntity dbEntity);
 
     // DTO simple → Entité DB
@@ -114,6 +140,10 @@ public interface JiraMapper {
     @Mapping(source = "created", target = "created", qualifiedByName = "formatDateForDb")
     @Mapping(source = "updated", target = "updated", qualifiedByName = "formatDateForDb")
     @Mapping(source = "resolved", target = "resolved", qualifiedByName = "formatDateForDb")
+    @Mapping(source = "month", target = "issueMonth")
+    @Mapping(target = "assigneeEmail", ignore = true)
+    @Mapping(target = "reporterEmail", ignore = true)
+    @Mapping(target = "selfUrl", ignore = true)
     JiraIssueDbEntity toDbEntityFromSimpleDto(IssueSimpleDto dto);
 
     // Méthodes pour les listes

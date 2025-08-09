@@ -59,18 +59,31 @@ public class JiraIssueService {
         return jiraIssueRepository.findByIssueKey(issueKey)
                 .next()
                 .flatMap(existingEntity -> {
+                    System.out.println("DEBUG: Found existing entity for " + issueKey + ", updated=" + existingEntity.getUpdated());
                     if (existingEntity.getUpdated() != null &&
                             isRecentlyUpdatedInJira(existingEntity.getUpdated())) {
-                        return Mono.just(jiraMapper.toSimpleDtoFromDb(existingEntity));
+                        System.out.println("DEBUG: Using cached data for " + issueKey);
+                        try {
+                            IssueSimpleDto dto = jiraMapper.toSimpleDtoFromDb(existingEntity);
+                            System.out.println("DEBUG: Mapper returned DTO: " + (dto != null ? dto.getIssueKey() : "NULL"));
+                            return Mono.just(dto);
+                        } catch (Exception e) {
+                            System.err.println("DEBUG: Mapper threw exception: " + e.getMessage());
+                            e.printStackTrace();
+                            throw e;
+                        }
                     }
+                    System.out.println("DEBUG: Entity not recent, fetching from Jira for " + issueKey);
                     return synchroniserDepuisJira(issueKey);
                 })
-                .switchIfEmpty(synchroniserDepuisJira(issueKey))
+                .switchIfEmpty(Mono.fromRunnable(() -> System.out.println("DEBUG: No entity found, fetching from Jira for " + issueKey))
+                        .then(synchroniserDepuisJira(issueKey)))
                 .doOnError(error -> {
-                    System.err.println("Erreur sync " + issueKey + ": " + error.getMessage());
+                    System.err.println("DEBUG: doOnError triggered for " + issueKey + ": " + error.getMessage());
                     error.printStackTrace();
                 })
                 .onErrorResume(error -> {
+                    System.err.println("DEBUG: onErrorResume triggered for " + issueKey + ": " + error.getMessage());
                     // Fallback : essayer de récupérer depuis Jira directement
                     return jiraWebClient.getIssue(issueKey)
                             .map(jiraMapper::toSimpleDtoFromApi)
@@ -179,9 +192,13 @@ public class JiraIssueService {
                 // Assume it's already parsed
                 updated = LocalDateTime.parse(updatedStr);
             }
-            return updated.isAfter(LocalDateTime.now().minusHours(1));
+            LocalDateTime threshold = LocalDateTime.now().minusHours(1);
+            boolean isRecent = updated.isAfter(threshold);
+            System.out.println("DEBUG isRecentlyUpdatedInJira: updated=" + updated + ", threshold=" + threshold + ", isRecent=" + isRecent);
+            return isRecent;
         } catch (Exception e) {
             System.err.println("Erreur lors du parsing de la date: " + updatedStr + " - " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }

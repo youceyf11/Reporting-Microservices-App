@@ -2,14 +2,22 @@ package org.project.jirafetchservice.jiraApi;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * Représentation brute de la réponse JSON de l'API Jira.
  * Permet la désérialisation automatique des tickets Jira avant transformation en entités métier.
  * convertir la reponse JSON de l'API Jira en objets Java.
  */
-@Data
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class JiraIssueApiResponse {
     private String id;
@@ -91,5 +99,16 @@ public class JiraIssueApiResponse {
     public static class User {
         private String displayName;
         private String emailAddress;
+    }
+
+    public void setSummary(String summary){
+        if(this.fields == null){
+            this.fields = new Fields();
+        }
+        this.fields.setSummary(summary);
+    }
+
+    public String getSummary(){
+        return this.fields != null ? this.fields.getSummary() : null;
     }
 }
