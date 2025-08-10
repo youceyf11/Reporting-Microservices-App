@@ -20,4 +20,5 @@ public interface ITimeUtils {
     double getExpectedHoursForMonth(YearMonth yearMonth, double hoursPerDay);
     double roundToTwoDecimals(double value);
     String getCurrentYear();
+    YearMonth getCurrentYearMonth();
 }

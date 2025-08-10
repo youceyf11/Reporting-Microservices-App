@@ -37,72 +37,51 @@ public class ReportingService implements IReportingService {
                 .filter(this::isResolvedInCurrentMonth)
                 .filter(issue -> issue.getAssignee() != null && !issue.getAssignee().trim().isEmpty())
                 .collectList()
-                .map(this::processIssuesWithEnhancedAnalytics)
+                .map(issues -> processIssuesWithEnhancedAnalytics(issues, projectKey))
+                .switchIfEmpty(Mono.just(new ReportingResultDto(
+                        timeUtils.getCurrentMonth(LocalDateTime.now()),
+                        timeUtils.getCurrentYear(),
+                        projectKey,
+                        List.of()
+                )))
                 .doOnError(error -> System.err.println("[ReportingService] Final error: " + error));
     }
 
     @Override
     public Mono<List<EmployeePerformanceDto>> getTopActiveEmployees(String projectKey, Integer topN) {
+        // Handle zero limit immediately
+        if (topN != null && topN == 0) {
+            return Mono.just(List.of());
+        }
+        
         return generateMonthlyReport(projectKey)
                 .map(report -> {
                     List<EmployeePerformanceDto> rankings = report.getEmployeeRankings() != null ? report.getEmployeeRankings() : List.of();
                     return rankings.stream()
-                            .limit(topN != null ? topN : 0)
+                            .limit(topN != null ? topN : Integer.MAX_VALUE)
                             .toList();
                 });
     }
 
     @Override
     public Mono<Tuple2<Double, Integer>> getMonthlyStatistics(String projectKey) {
-        System.out.println("=== DEBUG SERVICE: Début getMonthlyStatistics pour projet: " + projectKey);
-
         return generateMonthlyReport(projectKey)
-                .doOnNext(report -> {
-                    System.out.println("=== DEBUG SERVICE: Report généré, employeeRankings: " +
-                            (report.getEmployeeRankings() != null ? report.getEmployeeRankings().size() : "null"));
-                })
                 .map(report -> {
-                    try {
-                        System.out.println("=== DEBUG SERVICE: Dans map, début calcul");
-
-                        List<EmployeePerformanceDto> rankings = report.getEmployeeRankings();
-                        System.out.println("=== DEBUG SERVICE: Rankings récupérés: " + (rankings != null ? rankings.size() : "null"));
-
-                        if (rankings == null || rankings.isEmpty()) {
-                            System.out.println("=== DEBUG SERVICE: Rankings vide, retour (0.0, 0)");
-                            return reactor.util.function.Tuples.of(0.0, 0);
-                        }
-
-                        double totalHours = rankings.stream()
-                                .mapToDouble(e -> {
-                                    Double hours = e.getTotalHoursWorked();
-                                    System.out.println("=== DEBUG SERVICE: Employee hours: " + hours);
-                                    return hours != null ? hours : 0.0;
-                                })
-                                .sum();
-
-                        int employeeCount = rankings.size();
-
-                        System.out.println("=== DEBUG SERVICE: Calculs finaux - totalHours: " + totalHours +
-                                ", employeeCount: " + employeeCount);
-
-                        Tuple2<Double, Integer> result = reactor.util.function.Tuples.of(totalHours, employeeCount);
-                        System.out.println("=== DEBUG SERVICE: Tuple créé avec succès");
-
-                        return result;
-
-                    } catch (Exception e) {
-                        System.err.println("=== DEBUG SERVICE: EXCEPTION dans map: " + e.getMessage());
-                        e.printStackTrace();
+                    List<EmployeePerformanceDto> rankings = report.getEmployeeRankings();
+                    
+                    if (rankings == null || rankings.isEmpty()) {
                         return reactor.util.function.Tuples.of(0.0, 0);
                     }
-                })
-                .doOnError(error -> {
-                    System.err.println("=== DEBUG SERVICE: ERREUR dans getMonthlyStatistics: " + error.getMessage());
-                    error.printStackTrace();
+
+                    double totalHours = rankings.stream()
+                            .mapToDouble(e -> e.getTotalHoursWorked() != null ? e.getTotalHoursWorked() : 0.0)
+                            .sum();
+
+                    int employeeCount = rankings.size();
+
+                    return reactor.util.function.Tuples.of(totalHours, employeeCount);
                 });
     }
-
 
     @Override
     public Mono<Map<String, Map<Integer, Double>>> getWeeklyStatistics(String projectKey) {
@@ -122,7 +101,6 @@ public class ReportingService implements IReportingService {
                 .map(this::calculateHoursByEmployeeByMonth);
     }
 
-
     @Override
     public Mono<WeeklyStatsDto> getEmployeeWeeklyStats(String projectKey, String assignee) {
         return getWeeklyStatistics(projectKey)
@@ -141,8 +119,6 @@ public class ReportingService implements IReportingService {
                 });
     }
 
-
-
     // --- Internal business logic methods ---
 
     private boolean isResolvedInCurrentMonth(IssueSimpleDto issue) {
@@ -152,11 +128,12 @@ public class ReportingService implements IReportingService {
     /**
      * Traite tous les issues avec une analyse améliorée incluant les calculs par semaine/mois
      */
-    private ReportingResultDto processIssuesWithEnhancedAnalytics(List<IssueSimpleDto> allIssues) {
+    private ReportingResultDto processIssuesWithEnhancedAnalytics(List<IssueSimpleDto> allIssues, String projectKey) {
         if (allIssues == null || allIssues.isEmpty()) {
             return new ReportingResultDto(
                     timeUtils.getCurrentMonth(LocalDateTime.now()),
                     timeUtils.getCurrentYear(),
+                    projectKey,
                     List.of()
             );
         }
@@ -184,7 +161,7 @@ public class ReportingService implements IReportingService {
                 ))
                 .toList();
 
-        return createReportWithRanking(employeeReports);
+        return createReportWithRanking(employeeReports, projectKey);
     }
 
     /**
@@ -318,11 +295,12 @@ public class ReportingService implements IReportingService {
         return dto;
     }
 
-    private ReportingResultDto createReportWithRanking(List<EmployeePerformanceDto> employeeReports) {
+    private ReportingResultDto createReportWithRanking(List<EmployeePerformanceDto> employeeReports, String projectKey) {
         if (employeeReports == null || employeeReports.isEmpty()) {
             return new ReportingResultDto(
                     timeUtils.getCurrentMonth(LocalDateTime.now()),
                     timeUtils.getCurrentYear(),
+                    projectKey,
                     List.of()
             );
         }
@@ -341,6 +319,7 @@ public class ReportingService implements IReportingService {
         return new ReportingResultDto(
                 timeUtils.getCurrentMonth(LocalDateTime.now()),
                 timeUtils.getCurrentYear(),
+                projectKey,
                 sortedReports
         );
 

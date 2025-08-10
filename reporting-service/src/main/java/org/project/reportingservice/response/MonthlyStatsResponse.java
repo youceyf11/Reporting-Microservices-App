@@ -7,7 +7,7 @@ package org.project.reportingservice.response;
      */
 
 
-    public class MonthlyStatsResponse {
+ public class MonthlyStatsResponse {
         private Double totalHoursWorked;
         private Integer totalEmployees;
         private Double averageHoursPerEmployee;

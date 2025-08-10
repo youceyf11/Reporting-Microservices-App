@@ -45,11 +45,11 @@ public class ReportingController {
             @RequestParam String projectKey) {
         return reportingService.generateMonthlyReport(projectKey)
                 .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.ok(new ReportingResultDto("No data found", "", List.of())))
+                .defaultIfEmpty(ResponseEntity.ok(new ReportingResultDto("No data found", "", projectKey, List.of())))
                 .onErrorResume(error -> {
                     error.printStackTrace();
                     // Return an empty ReportingResultDto with a message
-                    ReportingResultDto emptyResult = new ReportingResultDto("Error occurred", "", List.of());
+                    ReportingResultDto emptyResult = new ReportingResultDto("Error occurred", "", projectKey, List.of());
                     return Mono.just(ResponseEntity.ok(emptyResult));
                 });
     }
@@ -64,12 +64,23 @@ public class ReportingController {
     @GetMapping("/monthly/top")
     public Mono<ResponseEntity<List<EmployeePerformanceDto>>> getTopActiveEmployees(
             @RequestParam String projectKey,
-            @RequestParam(defaultValue = "10") Integer limit) {
+            @RequestParam(defaultValue = "10") String limitStr) {
+
+        // Validate and parse limit
+        Integer limit;
+        try {
+            limit = Integer.parseInt(limitStr);
+            if (limit < 0) {
+                return Mono.just(ResponseEntity.badRequest().build());
+            }
+        } catch (NumberFormatException e) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
 
         return reportingService.getTopActiveEmployees(projectKey, limit)
                 .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.notFound().build())
-                .onErrorReturn(ResponseEntity.internalServerError().build());
+                .defaultIfEmpty(ResponseEntity.ok(List.of()))
+                .onErrorReturn(ResponseEntity.ok(List.of()));
     }
 
     /**
@@ -115,30 +126,17 @@ public class ReportingController {
     public Mono<ResponseEntity<MonthlyStatsResponse>> getMonthlyStatistics(
             @RequestParam String projectKey) {
 
-        log.info("=== DEBUG: Début getMonthlyStatistics pour projet: {}", projectKey);
+        // Validate project key
+        if (projectKey == null || projectKey.trim().isEmpty()) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
 
         return reportingService.getMonthlyStatistics(projectKey)
-                .doOnNext(stats -> {
-                    log.info("=== DEBUG: Stats reçues du service: totalHours={}, employeeCount={}",
-                            stats.getT1(), stats.getT2());
-                })
-                .map(stats -> {
-                    log.info("=== DEBUG: Avant createStatsResponse");
-                    MonthlyStatsResponse response = this.createStatsResponse(stats);
-                    log.info("=== DEBUG: Après createStatsResponse: {}", response);
-                    return response;
-                })
-                .map(response -> {
-                    log.info("=== DEBUG: Création ResponseEntity OK");
-                    return ResponseEntity.ok(response);
-                })
-                .doOnError(error -> {
-                    log.error("=== DEBUG: ERREUR CAPTUREE - Type: {}, Message: {}",
-                            error.getClass().getSimpleName(), error.getMessage());
-                    log.error("=== DEBUG: Stack trace complète:", error);
-                })
+                .map(this::createStatsResponse)
+                .map(ResponseEntity::ok)
                 .onErrorResume(error -> {
-                    log.error("=== DEBUG: Dans onErrorResume");
+                    log.error("Error generating monthly statistics for project {}: {}", 
+                            projectKey, error.getMessage(), error);
                     MonthlyStatsResponse errorResponse = new MonthlyStatsResponse(0.0, 0, 0.0);
                     return Mono.just(ResponseEntity.status(500).body(errorResponse));
                 });
@@ -168,6 +166,16 @@ public class ReportingController {
             @PathVariable String projectKey,
             @PathVariable String assignee) {
 
+        // Validate project key
+        if (projectKey == null || projectKey.trim().isEmpty()) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+
+        // Validate assignee
+        if (assignee == null || assignee.trim().isEmpty()) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+
         return reportingService.getEmployeeWeeklyStats(projectKey, assignee)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
@@ -182,14 +190,35 @@ public class ReportingController {
             @PathVariable String assignee,
             @RequestParam(defaultValue = "160.0") Double expectedHours) {
 
+        // Validate project key
+        if (projectKey == null || projectKey.trim().isEmpty()) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+
+        // Validate assignee
+        if (assignee == null || assignee.trim().isEmpty()) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+
+        // Validate expected hours
+        if (expectedHours < 0) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+
         return reportingService.getEmployeeMonthlyStats(projectKey, assignee, expectedHours)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/monthly/detailed/{projectKey}")
-    public Mono<Map<String, Map<Integer, Double>>> getDetailedMonthlyStatistics(@PathVariable String projectKey) {
-        return reportingService.getDetailedMonthlyStatistics(projectKey);
+    public Mono<ResponseEntity<Map<String, Map<Integer, Double>>>> getDetailedMonthlyStatistics(@PathVariable String projectKey) {
+        // Validate project key
+        if (projectKey == null || projectKey.trim().isEmpty()) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+        return reportingService.getDetailedMonthlyStatistics(projectKey)
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
     /**

@@ -9,6 +9,7 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.Year;
+import java.util.Locale;
 
 @Component
 public class TimeUtils implements ITimeUtils {
@@ -73,9 +74,9 @@ public class TimeUtils implements ITimeUtils {
     @Override
     public String formatHours(double hours) {
         if (hours == 0) return "0h";
-        if (hours < 1) return String.format("%.2fh", hours);
-        if (hours == Math.floor(hours)) return String.format("%.0fh", hours);
-        return String.format("%.1fh", hours);
+        if (hours < 1) return String.format(Locale.US, "%.2fh", hours);
+        if (hours == Math.floor(hours)) return String.format(Locale.US, "%.0fh", hours);
+        return String.format(Locale.US, "%.1fh", hours);
     }
 
     @Override
@@ -115,5 +116,10 @@ public class TimeUtils implements ITimeUtils {
     @Override
     public String getCurrentYear() {
         return String.valueOf(Year.now().getValue());
+    }
+
+    @Override
+    public YearMonth getCurrentYearMonth() {
+        return YearMonth.now();
     }
 }

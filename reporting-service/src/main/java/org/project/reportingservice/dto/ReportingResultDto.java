@@ -19,6 +19,9 @@ public class ReportingResultDto {
     @JsonProperty("reportGeneratedAt")
     private LocalDateTime reportGeneratedAt;
 
+    @JsonProperty("projectKey")
+    private String projectKey;
+
     @JsonProperty("month")
     private String month;
 
@@ -56,6 +59,15 @@ public class ReportingResultDto {
     public ReportingResultDto(String month, List<EmployeePerformanceDto> employeeRankings) {
         this();
         this.month = month;
+        this.employeeRankings = employeeRankings;
+        calculateTotals();
+    }
+
+    public ReportingResultDto(String month, String year, String projectKey, List<EmployeePerformanceDto> employeeRankings) {
+        this();
+        this.month = month;
+        this.year = year;
+        this.projectKey = projectKey;
         this.employeeRankings = employeeRankings;
         calculateTotals();
     }

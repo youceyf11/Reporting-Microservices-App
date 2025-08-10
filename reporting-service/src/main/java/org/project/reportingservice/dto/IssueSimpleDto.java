@@ -32,14 +32,34 @@ public class IssueSimpleDto {
     private String month;            // Pour regrouper les stats mensuelles
     private String quotaPerProject;  // Heures attendues sur le projet
 
+    
     public IssueSimpleDto(String issueKey, String summary) {
         this.issueKey = issueKey;
         this.summary = summary;
     }
 
+
+    // Constructor for test data creation with key fields
+public IssueSimpleDto(String issueKey, String assignee, Long timeSpentSeconds, String resolved) {
+    this.issueKey = issueKey;
+    this.assignee = assignee;
+    this.timeSpentSeconds = timeSpentSeconds;
+    this.resolved = resolved != null ? LocalDateTime.parse(resolved) : null;
+}
+
     public boolean isResolved() {
         return resolved != null;
     }
 
+    /**
+     * Converts timeSpentSeconds to hours
+     * @return time spent in hours, or 0.0 if timeSpentSeconds is null
+     */
+    public Double getTimeSpentHours() {
+        if (timeSpentSeconds == null) {
+            return 0.0;
+        }
+        return timeSpentSeconds / 3600.0;
+    }
 
 }
