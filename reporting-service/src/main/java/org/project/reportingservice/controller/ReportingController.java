@@ -43,6 +43,12 @@ public class ReportingController {
     @GetMapping("/monthly")
     public Mono<ResponseEntity<ReportingResultDto>> getMonthlyReport(
             @RequestParam String projectKey) {
+        
+        // Validate project key
+        if (projectKey == null || projectKey.trim().isEmpty()) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+        
         return reportingService.generateMonthlyReport(projectKey)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.ok(new ReportingResultDto("No data found", "", projectKey, List.of())))
@@ -64,23 +70,35 @@ public class ReportingController {
     @GetMapping("/monthly/top")
     public Mono<ResponseEntity<List<EmployeePerformanceDto>>> getTopActiveEmployees(
             @RequestParam String projectKey,
-            @RequestParam(defaultValue = "10") String limitStr) {
+            @RequestParam(name = "limit", defaultValue = "10") String limitStr) {
 
-        // Validate and parse limit
+        // 1. Parse and validate limit parameter
         Integer limit;
         try {
             limit = Integer.parseInt(limitStr);
-            if (limit < 0) {
-                return Mono.just(ResponseEntity.badRequest().build());
-            }
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException ex) {
+            // Non-numeric limit ⇒ 400 BAD_REQUEST
             return Mono.just(ResponseEntity.badRequest().build());
         }
 
+        if (limit < 0) {
+            // Negative limit ⇒ 400 BAD_REQUEST
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+
+        // 2. Fast-path: limit == 0 ⇒ return empty list with 200 OK
+        if (limit == 0) {
+            return Mono.just(ResponseEntity.ok(List.of()));
+        }
+
+        // 3. Delegate to service
         return reportingService.getTopActiveEmployees(projectKey, limit)
+                // Success → 200 OK
                 .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.ok(List.of()))
-                .onErrorReturn(ResponseEntity.ok(List.of()));
+                // No employees → 404 NOT_FOUND
+                .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()))
+                // Service error → 500 INTERNAL_SERVER_ERROR
+                .onErrorResume(err -> Mono.just(ResponseEntity.status(500).build()));
     }
 
     /**

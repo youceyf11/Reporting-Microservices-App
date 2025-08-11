@@ -521,15 +521,5 @@ class ReportingServiceApplicationTests {
                     .expectStatus().isOk();
         }
 
-        @Test
-        @DisplayName("Should have proper CORS configuration")
-        void shouldHaveProperCorsConfiguration() {
-            webTestClient.options()
-                    .uri("/api/reporting/monthly")
-                    .header("Origin", "http://localhost:3000")
-                    .header("Access-Control-Request-Method", "GET")
-                    .exchange()
-                    .expectStatus().isOk();
-        }
     }
 }

@@ -32,19 +32,26 @@ public class ReportingService implements IReportingService {
     @Override
     public Mono<ReportingResultDto> generateMonthlyReport(String projectKey) {
         return jiraClient.fetchProjectIssues(projectKey, 100)
-                .doOnNext(issue -> System.out.println("[ReportingService] Received issue: " + issue))
-                .doOnError(error -> System.err.println("[ReportingService] Error: " + error))
                 .filter(this::isResolvedInCurrentMonth)
                 .filter(issue -> issue.getAssignee() != null && !issue.getAssignee().trim().isEmpty())
                 .collectList()
-                .map(issues -> processIssuesWithEnhancedAnalytics(issues, projectKey))
-                .switchIfEmpty(Mono.just(new ReportingResultDto(
+                .flatMap(issues -> {
+                    if (issues.isEmpty()) {
+                        return Mono.just(new ReportingResultDto(
+                                timeUtils.getCurrentMonth(LocalDateTime.now()),
+                                timeUtils.getCurrentYear(),
+                                projectKey,
+                                List.of()
+                        ));
+                    }
+                    return Mono.just(processIssuesWithEnhancedAnalytics(issues, projectKey));
+                })
+                .defaultIfEmpty(new ReportingResultDto(
                         timeUtils.getCurrentMonth(LocalDateTime.now()),
                         timeUtils.getCurrentYear(),
                         projectKey,
                         List.of()
-                )))
-                .doOnError(error -> System.err.println("[ReportingService] Final error: " + error));
+                ));
     }
 
     @Override

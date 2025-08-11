@@ -45,7 +45,7 @@ class ReportingServiceTest {
         lenient().when(timeUtils.getCurrentMonth(any(LocalDateTime.class))).thenReturn("August");
         lenient().when(timeUtils.getCurrentYear()).thenReturn("2025");
         lenient().when(timeUtils.isInCurrentMonth(any(LocalDateTime.class))).thenReturn(true);
-        lenient().when(timeUtils.getExpectedHoursForMonth()).thenReturn(160.0); 
+        lenient().when(timeUtils.getExpectedHoursForMonth(any(YearMonth.class), eq(8.0))).thenReturn(160.0); 
         
         // Add missing method stubs for performance calculations
         lenient().when(timeUtils.calculatePerformancePercentage(anyDouble(), anyDouble()))

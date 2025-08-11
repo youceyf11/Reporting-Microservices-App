@@ -111,15 +111,13 @@ class ReportingControllerTest {
         }
 
         @Test
-        @DisplayName("GET /api/reporting/monthly - should return error message when projectKey missing")
+        @DisplayName("GET /api/reporting/monthly - should return 400 when projectKey missing")
         void getMonthlyReport_shouldReturn400_whenProjectKeyMissing() {
-            // Act & Assert - Global exception handler catches missing param and returns 200 OK with error message
+            // Act & Assert - Now expects 400 BAD_REQUEST with validation
             webTestClient.get()
                     .uri("/api/reporting/monthly")
                     .exchange()
-                    .expectStatus().isOk()
-                    .expectBody(String.class)
-                    .isEqualTo("{\"message\": \"An error occurred, but the server is still running.\"}");
+                    .expectStatus().isBadRequest();
         }
     }
 

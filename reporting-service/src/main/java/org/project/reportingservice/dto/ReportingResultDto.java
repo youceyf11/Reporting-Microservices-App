@@ -75,38 +75,25 @@ public class ReportingResultDto {
     /**
      * Calcule les totaux à partir des données des employés
      */
-  /*  private void calculateTotals() {
-        if (employeeRankings != null && !employeeRankings.isEmpty()) {
-            this.totalEmployees = employeeRankings.size();
-            this.totalHoursWorked = employeeRankings.stream()
-                    .mapToDouble(EmployeePerformanceDto::getTotalHoursWorked)
-                    .sum();
-            this.totalIssuesResolved = employeeRankings.stream()
-                    .mapToInt(EmployeePerformanceDto::getTotalIssuesResolved)
-                    .sum();
-            this.averageResolutionTimeHours = employeeRankings.stream()
-                    .mapToDouble(EmployeePerformanceDto::getAverageResolutionTimeHours)
-                    .average()
-                    .orElse(0.0);
-        }
-    } */
-
     private void calculateTotals() {
-        if (employeeRankings != null && !employeeRankings.isEmpty()) {
-            this.totalEmployees = employeeRankings.size();
-            this.totalHoursWorked = employeeRankings.stream()
-                    .mapToDouble(e -> e.getTotalHoursWorked() != null ? e.getTotalHoursWorked() : 0.0)
-                    .sum();
-            this.totalIssuesResolved = employeeRankings.stream()
-                    .mapToInt(e -> e.getTotalIssuesResolved() != null ? e.getTotalIssuesResolved() : 0)
-                    .sum();
-            this.averageResolutionTimeHours = employeeRankings.stream()
-                    .mapToDouble(e -> e.getAverageResolutionTimeHours() != null ? e.getAverageResolutionTimeHours() : 0.0)
-                    .average()
-                    .orElse(0.0);
+        if (employeeRankings == null || employeeRankings.isEmpty()) {
+            this.totalEmployees = 0;
+            this.totalHoursWorked = 0.0;
+            this.totalIssuesResolved = 0;
+            this.averageResolutionTimeHours = 0.0;
+            return;
         }
+
+        this.totalEmployees = employeeRankings.size();
+        this.totalHoursWorked = employeeRankings.stream()
+                .mapToDouble(e -> e.getTotalHoursWorked() != null ? e.getTotalHoursWorked() : 0.0)
+                .sum();
+        this.totalIssuesResolved = employeeRankings.stream()
+                .mapToInt(e -> e.getTotalIssuesResolved() != null ? e.getTotalIssuesResolved() : 0)
+                .sum();
+        this.averageResolutionTimeHours = employeeRankings.stream()
+                .mapToDouble(e -> e.getAverageResolutionTimeHours() != null ? e.getAverageResolutionTimeHours() : 0.0)
+                .average()
+                .orElse(0.0);
     }
-
-
-
 }
