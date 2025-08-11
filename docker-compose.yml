@@ -6,6 +6,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${JIRA_FETCH_SERVICE_PORT}:8081"
+    env_file: .env
     environment:
       - JIRA_BASE_URL=${JIRA_BASE_URL}
       - JIRA_USERNAME=${JIRA_USERNAME}
@@ -24,6 +25,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${REPORTING_SERVICE_PORT}:8082"
+    env_file: .env
     environment:
       - REPORTING_SERVICE_PORT=${REPORTING_SERVICE_PORT}
       - JIRA_FETCH_BASE_URL=${JIRA_FETCH_BASE_URL}
@@ -37,6 +39,7 @@ services:
         dockerfile: Dockerfile
     ports:
       - "${CHART_SERVICE_PORT}:8083"
+    env_file: .env
     environment:
       - REPORTING_SERVICE_URL=${REPORTING_SERVICE_URL}
     depends_on:
@@ -50,11 +53,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${EMAIL_SERVICE_PORT}:8084"
+    env_file: .env
     depends_on:
       - redis
       - rabbitmq
     environment:
-      - SPRING_REDIS_HOST=redis
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_DATA_REDIS_HOST=redis     
       - SPRING_DATA_REDIS_PORT=6379
@@ -90,22 +93,37 @@ services:
       - "${RABBITMQ_PORT}:5672"
       - "${RABBITMQ_MANAGEMENT_PORT}:15672"
     environment:
-      - RABBITMQ_DEFAULT_USER=guest
-      - RABBITMQ_DEFAULT_PASS=guest
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
 
   postgres:
     image: postgres:16
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=jira_db
-      - POSTGRES_USER=jira
-      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
       - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jira"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+
+  zookeeper:
+    image: bitnami/zookeeper:3
+    ports: ["2181:2181"]
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+  kafka:
+    image: bitnami/kafka:3
+    ports: 
+      - "${KAFKA_PORT}:9092"
+    environment:
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      ALLOW_PLAINTEXT_LISTENER: yes
+
 
 volumes:
   postgres_data:
