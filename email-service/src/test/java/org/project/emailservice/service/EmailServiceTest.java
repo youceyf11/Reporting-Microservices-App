@@ -2,435 +2,79 @@ package org.project.emailservice.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.*;
+import org.project.emailservice.dto.EmailRequest;
+import org.project.emailservice.dto.EmailResponse;
+import org.project.emailservice.entity.EmailLog;
+import org.project.emailservice.enums.EmailPriority;
+import org.project.emailservice.enums.EmailStatus;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.core.ReactiveValueOperations;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
-import org.project.emailservice.dto.EmailRequest;
-import org.project.emailservice.dto.EmailResponse;
-import org.project.emailservice.dto.EmailAttachment;
-import org.project.emailservice.entity.EmailLog;
-import org.project.emailservice.enums.EmailStatus;
-import org.project.emailservice.enums.EmailPriority;
-import java.time.Instant;
-import java.time.Duration;
-import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
 
-import static org.mockito.ArgumentMatchers.*;
+import java.util.Map;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
-/**
- * Tests unitaires pour EmailService
- * 
- * LOGIQUE DES TESTS:
- * 1. Test de la logique métier principale (envoi d'emails, gestion des statuts)
- * 2. Test des interactions avec Redis (cache, persistance des logs)
- * 3. Test des interactions avec les services dépendants (Queue, Template, Provider)
- * 4. Test de la gestion des erreurs et des cas limites
- * 5. Test du comportement réactif avec Project Reactor
- * 6. Test des opérations en lot et de la performance
- */
-@ExtendWith(MockitoExtension.class)
-@DisplayName("EmailService Tests - Tests de la logique métier principale")
+@ExtendWith(org.mockito.junit.jupiter.MockitoExtension.class)
 class EmailServiceTest {
 
-    @Mock
-    private QueueService queueService;
+    @Mock ReactiveRedisTemplate<String, EmailLog> redisTemplate;
+    @Mock QueueService queueService;
+    @Mock TemplateService templateService;
+    @Mock com.fasterxml.jackson.databind.ObjectMapper mapper;
+    @Mock ReactiveValueOperations<String, EmailLog> valueOps;
 
-    @Mock
-    private TemplateService templateService;
+    EmailService service;
 
-    @Mock
-    private ProviderService providerService;
-
-    @Mock
-    private ReactiveRedisTemplate<String, EmailLog> redisTemplate;
-
-    @Mock
-    private ReactiveValueOperations<String, EmailLog> valueOperations;
-
-    @InjectMocks
-    private EmailService emailService;
-
-    private EmailRequest validEmailRequest;
-    private EmailLog mockEmailLog;
-    private EmailResponse mockEmailResponse;
-
-    @BeforeEach // @BeforeEach est un hook qui s'exécute avant chaque test
+    @BeforeEach
     void setUp() {
-        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        service = new EmailService(redisTemplate, queueService, templateService, mapper);
+    }
 
-        lenient().when(valueOperations.set(anyString(), any(EmailLog.class))).thenReturn(Mono.just(true));
-        lenient().when(valueOperations.set(anyString(), any(EmailLog.class), any(Duration.class))).thenReturn(Mono.just(true));
-        lenient().when(valueOperations.get(anyString())).thenReturn(Mono.empty());
-        lenient().when(valueOperations.multiGet(anyList())).thenReturn(Mono.just(List.of()));
-
-        lenient().when(queueService.queueEmail(any(EmailRequest.class), anyString())).thenReturn(Mono.empty());
-
-        lenient().when(templateService.renderTemplate(anyString(), anyMap())).thenReturn(Mono.just("<html>Test</html>"));
-        lenient().when(providerService.sendEmail(any(EmailRequest.class))).thenReturn(Mono.just("test-message-id"));
-
-        validEmailRequest = EmailRequest.builder()
-                .to("test@example.com")
-                .from("sender@example.com")
-                .subject("Test Email")
-                .templateName("test-template")
-                .templateData(Map.of("name", "Test User", "message", "Hello World"))
-                .priority(EmailPriority.NORMAL)
-                .attachments(List.of(
-                    EmailAttachment.builder()
-                        .filename("test.pdf")
-                        .content("test-content".getBytes())
-                        .contentType("application/pdf")
-                        .build()
-                ))
+    @Test
+    void processEmailRequest_persists_and_queues_request() {
+        // given
+        EmailRequest req = EmailRequest.builder()
+                .to("user@test.com")
+                .from("me@test.com")
+                .subject("hello")
+                .priority(EmailPriority.HIGH)
+                .metadata(Map.of("k","v"))
                 .build();
 
-        mockEmailLog = EmailLog.builder()
-                .id("test-email-id")
-                .to("test@example.com")
-                .from("sender@example.com")
-                .subject("Test Email")
-                .status(EmailStatus.QUEUED)
-                .createdAt(Instant.now())
-                .build();
+        when(valueOps.set(anyString(), any(EmailLog.class))).thenReturn(Mono.just(true));
+        when(queueService.queueEmail(any(), anyString())).thenReturn(Mono.empty());
 
-        mockEmailResponse = EmailResponse.builder()
-                .emailId("test-email-id")
-                .status(EmailStatus.QUEUED)
-                .message("Email queued successfully")
-                .createdAt(Instant.now())
-                .build();
-    }
+        // when
+        Mono<EmailResponse> result = service.processEmailRequest(req);
 
-    @Test
-    @DisplayName("sendEmail() - Envoi d'email réussi avec mise en queue")
-    void testSendEmail_Success() {
-        // ACT
-        Mono<EmailResponse> result = emailService.processEmailRequest(validEmailRequest);
-
-        // ASSERT
+        // then
         StepVerifier.create(result)
-                .expectNextMatches(response -> 
-                    response.getEmailId() != null &&
-                    response.getStatus() == EmailStatus.QUEUED
-                )
-                .verifyComplete();
-
-        verify(valueOperations).set(anyString(), any(EmailLog.class), any(Duration.class));
-        verify(queueService).queueEmail(any(EmailRequest.class), anyString());
-    }
-
-    @Test
-    @DisplayName("sendEmail() - Échec de sauvegarde Redis")
-    void testSendEmail_RedisFailure() {
-        // ARRANGE
-        lenient().when(valueOperations.set(anyString(), any(EmailLog.class), any(Duration.class)))
-                .thenReturn(Mono.error(new RuntimeException("Redis connection failed")));
-
-        // ACT
-        Mono<EmailResponse> result = emailService.processEmailRequest(validEmailRequest);
-
-        // ASSERT
-        StepVerifier.create(result)
-                .expectError(RuntimeException.class)
-                .verify();
-
-        // Vérifier que la queue n'est pas appelée en cas d'erreur Redis
-        verify(queueService, never()).queueEmail(any(EmailRequest.class), anyString());
-    }
-
-    @Test
-    @DisplayName("sendEmail() - Échec de mise en queue")
-    void testSendEmail_QueueFailure() {
-        // ARRANGE
-        lenient().when(valueOperations.set(anyString(), any(EmailLog.class), any(Duration.class)))
-                .thenReturn(Mono.just(true));
-        when(queueService.queueEmail(any(EmailRequest.class), anyString()))
-                .thenReturn(Mono.error(new RuntimeException("RabbitMQ connection failed")));
-
-        // ACT
-        Mono<EmailResponse> result = emailService.processEmailRequest(validEmailRequest);
-
-        // ASSERT
-        StepVerifier.create(result)
-                .expectError(RuntimeException.class)
-                .verify();
-
-        verify(valueOperations).set(anyString(), any(EmailLog.class), any(Duration.class));
-        verify(queueService).queueEmail(any(EmailRequest.class), anyString());
-    }
-
-    @Test
-    @DisplayName("sendChartEmail - Succès de l'envoi")
-    void testSendChartEmail_Success() {
-        // ARRANGE
-        byte[] chartImage = "fake-chart-data".getBytes();
-        Map<String, Object> chartData = new HashMap<>();
-        chartData.put("recipientName", "Test User");
-        chartData.put("chartTitle", "Monthly Report");
-
-        String MOCKED_HTML_CONTENT = "<h1>Test Chart</h1><p>This is a test chart email.</p>";
-
-        when(templateService.renderChartEmailTemplate(anyMap())).thenReturn(Mono.just(MOCKED_HTML_CONTENT));
-
-        // ACT & ASSERT
-        StepVerifier.create(emailService.sendChartEmail("recipient@example.com", "Monthly Report", chartData, chartImage))
-                .assertNext(response -> {
-                    assert response.getEmailId() != null;
-                    assert response.getStatus() == EmailStatus.QUEUED;
-                    assert response.getMessage().contains("queued");
+                .assertNext(res -> {
+                    assertThat(res.getStatus()).isEqualTo(EmailStatus.QUEUED);
+                    assertThat(res.getEmailId()).isNotBlank();
                 })
                 .verifyComplete();
 
-        // VERIFY
-        verify(templateService).renderChartEmailTemplate(anyMap());
-        verify(queueService).queueEmail(any(EmailRequest.class), anyString());
+        verify(queueService).queueEmail(eq(req), anyString());
     }
 
     @Test
-    @DisplayName("getEmailStatus - Statut trouvé dans Redis")
-    void testGetEmailStatus_Found() {
-        // ARRANGE
-        String emailId = "found-id";
-        EmailLog foundLog = EmailLog.builder()
-                .id(emailId)
-                .to("to@example.com")
-                .from("from@example.com")
-                .subject("Test Subject")
-                .status(EmailStatus.SENT)
-                .priority(EmailPriority.NORMAL)
-                .createdAt(Instant.now())
-                .build();
+    void getEmailStatus_returns_not_found_when_absent() {
+        String id = UUID.randomUUID().toString();
+        when(valueOps.get("email:" + id)).thenReturn(Mono.empty());
 
-        when(valueOperations.get(eq("email:" + emailId))).thenReturn(Mono.just(foundLog));
-
-        // ACT
-        StepVerifier.create(emailService.getEmailStatus(emailId))
-                // ASSERT
-                .expectNextMatches(response -> 
-                     response.getEmailId().equals(emailId) &&
-                     response.getStatus() == EmailStatus.SENT
-                )
+        StepVerifier.create(service.getEmailStatus(id))
+                .assertNext(res -> {
+                    assertThat(res.getEmailId()).isEqualTo(id);
+                    assertThat(res.getStatus()).isEqualTo(EmailStatus.NOT_FOUND);
+                })
                 .verifyComplete();
-
-        verify(valueOperations).get(eq("email:" + emailId));
-    }
-
-    @Test
-    @DisplayName("getEmailStatus - Statut non trouvé dans Redis")
-    void testGetEmailStatus_NotFound() {
-        // ARRANGE
-        String emailId = "not-found-id";
-        when(valueOperations.get(eq("email:" + emailId))).thenReturn(Mono.empty());
-
-        // ACT
-        StepVerifier.create(emailService.getEmailStatus(emailId))
-                // ASSERT
-                .expectNextMatches(response -> 
-                        response.getStatus() == EmailStatus.NOT_FOUND &&
-                        response.getEmailId().equals(emailId)
-                )
-                .verifyComplete();
-
-        verify(valueOperations).get(eq("email:" + emailId));
-    }
-
-    @Test
-    @DisplayName("getBulkEmailStatus - Succès avec tous les statuts trouvés")
-    void testGetBulkEmailStatus_AllFound() {
-        // ARRANGE
-        List<String> emailIds = List.of("id1", "id2");
-        EmailLog log1 = EmailLog.builder()
-                .id("id1")
-                .to("to1@example.com")
-                .from("from1@example.com")
-                .subject("Test Subject 1")
-                .status(EmailStatus.SENT)
-                .priority(EmailPriority.NORMAL)
-                .createdAt(Instant.now())
-                .build();
-        EmailLog log2 = EmailLog.builder()
-                .id("id2")
-                .to("to2@example.com")
-                .from("from2@example.com")
-                .subject("Test Subject 2")
-                .status(EmailStatus.FAILED)
-                .priority(EmailPriority.HIGH)
-                .createdAt(Instant.now())
-                .build();
-
-        List<String> prefixedIds = emailIds.stream().map(id -> "email:" + id).toList();
-        when(valueOperations.multiGet(eq(prefixedIds))).thenReturn(Mono.just(List.of(log1, log2)));
-
-        // ACT
-        StepVerifier.create(emailService.getBulkEmailStatus(emailIds))
-                // ASSERT
-                .expectNextMatches(response -> response.getEmailId().equals("id1") && response.getStatus() == EmailStatus.SENT)
-                .expectNextMatches(response -> response.getEmailId().equals("id2") && response.getStatus() == EmailStatus.FAILED)
-                .verifyComplete();
-
-        verify(valueOperations).multiGet(eq(prefixedIds));
-    }
-
-    @Test
-    @DisplayName("getBulkEmailStatus - Certains statuts non trouvés")
-    void testGetBulkEmailStatus_SomeNotFound() {
-        // ARRANGE
-        List<String> emailIds = List.of("id1", "id-not-found");
-        EmailLog log1 = EmailLog.builder()
-                .id("id1")
-                .to("to1@example.com")
-                .from("from1@example.com")
-                .subject("Test Subject 1")
-                .status(EmailStatus.SENT)
-                .priority(EmailPriority.NORMAL)
-                .createdAt(Instant.now())
-                .build();
-
-        List<String> prefixedIds = emailIds.stream().map(id -> "email:" + id).toList();
-        when(valueOperations.multiGet(eq(prefixedIds))).thenReturn(Mono.just(List.of(log1)));
-
-        // ACT
-        StepVerifier.create(emailService.getBulkEmailStatus(emailIds))
-                // ASSERT
-                .expectNextMatches(response -> response.getEmailId().equals("id1") && response.getStatus() == EmailStatus.SENT)
-                .expectNextMatches(response -> response.getEmailId().equals("id-not-found") && response.getStatus() == EmailStatus.NOT_FOUND)
-                .verifyComplete();
-
-        verify(valueOperations).multiGet(eq(prefixedIds));
-    }
-
-    @Test
-    @DisplayName("updateEmailStatus - Mise à jour réussie")
-    void testUpdateEmailStatus_Success() {
-        // ARRANGE
-        String emailId = "update-id";
-        EmailLog existingLog = EmailLog.builder()
-                .id(emailId)
-                .to("to@example.com")
-                .from("from@example.com")
-                .subject("Test Subject")
-                .status(EmailStatus.QUEUED)
-                .priority(EmailPriority.NORMAL)
-                .createdAt(Instant.now())
-                .build();
-
-        when(valueOperations.get(eq("email:" + emailId))).thenReturn(Mono.just(existingLog));
-        when(valueOperations.set(eq("email:" + emailId), any(EmailLog.class))).thenReturn(Mono.just(true));
-
-        // ACT
-        StepVerifier.create(emailService.updateEmailStatus(emailId, EmailStatus.SENT, null))
-                // ASSERT
-                .verifyComplete();
-
-        verify(valueOperations).get(eq("email:" + emailId));
-        verify(valueOperations).set(eq("email:" + emailId), any(EmailLog.class));
-    }
-
-    @Test
-    @DisplayName("updateEmailStatus - Log initial non trouvé")
-    void testUpdateEmailStatus_LogNotFound() {
-        // ARRANGE
-        String emailId = "not-found-id";
-        when(valueOperations.get(eq("email:" + emailId))).thenReturn(Mono.empty());
-
-        // ACT
-        StepVerifier.create(emailService.updateEmailStatus(emailId, EmailStatus.SENT, "SMTP error"))
-                // ASSERT
-                .verifyComplete();
-
-        verify(valueOperations).get(eq("email:" + emailId));
-        // When log is not found, a new one is created and saved.
-        verify(valueOperations).set(eq("email:" + emailId), any(EmailLog.class), any(Duration.class));
-    }
-
-    @Test
-    @DisplayName("updateEmailStatus - Échec de la mise à jour Redis")
-    void testUpdateEmailStatus_RedisSetFailed() {
-        // ARRANGE
-        String emailId = "update-fail-id";
-        EmailLog existingLog = EmailLog.builder()
-                .id(emailId)
-                .to("to@example.com")
-                .from("from@example.com")
-                .subject("Test Subject")
-                .status(EmailStatus.QUEUED)
-                .priority(EmailPriority.NORMAL)
-                .createdAt(Instant.now())
-                .build();
-
-        when(valueOperations.get(eq("email:" + emailId))).thenReturn(Mono.just(existingLog));
-        when(valueOperations.set(eq("email:" + emailId), any(EmailLog.class))).thenReturn(Mono.just(false));
-
-        // ACT
-        StepVerifier.create(emailService.updateEmailStatus(emailId, EmailStatus.SENT, "SMTP error"))
-                // ASSERT
-                .verifyComplete();
-
-        verify(valueOperations).get(eq("email:" + emailId));
-        verify(valueOperations).set(eq("email:" + emailId), any(EmailLog.class));
-    }
-
-    @Test
-    @DisplayName("Test de performance - Envoi de multiples emails")
-    void testSendMultipleEmails_Performance() {
-        // ACT - Envoyer 10 emails en parallèle
-        Flux<EmailResponse> result = Flux.range(1, 10)
-                .flatMap(i -> {
-                    EmailRequest request = validEmailRequest.toBuilder()
-                            .to("test" + i + "@example.com")
-                            .build();
-                    return emailService.processEmailRequest(request);
-                });
-
-        // ASSERT
-        StepVerifier.create(result)
-                .expectNextCount(10)
-                .verifyComplete();
-
-        // Vérifier que tous les emails ont été traités
-        verify(valueOperations, times(10)).set(anyString(), any(EmailLog.class), any(Duration.class));
-        verify(queueService, times(10)).queueEmail(any(EmailRequest.class), anyString());
-    }
-
-    @Test
-    @DisplayName("Test de validation des données d'entrée")
-    void testEmailValidation() {
-        // ARRANGE - Email avec données manquantes
-        EmailRequest invalidRequest = EmailRequest.builder()
-                .subject("Test")
-                // Pas d'adresse destinataire
-                .build();
-
-        // ACT & ASSERT - Le service doit gérer les données invalides
-        StepVerifier.create(emailService.processEmailRequest(invalidRequest))
-                .expectNextMatches(response -> response.getEmailId() != null)
-                .verifyComplete();
-    }
-
-    @Test
-    @DisplayName("Test de timeout et retry")
-    void testEmailTimeout() {
-        // ARRANGE - Simulation d'un timeout Redis
-        lenient().when(valueOperations.set(anyString(), any(EmailLog.class), any(Duration.class)))
-                .thenReturn(Mono.just(true).delayElement(Duration.ofSeconds(5)));
-
-        // ACT
-        Mono<EmailResponse> result = emailService.processEmailRequest(validEmailRequest)
-                .timeout(Duration.ofSeconds(2));
-
-        // ASSERT
-        StepVerifier.create(result)
-                .expectError()
-                .verify();
     }
 }

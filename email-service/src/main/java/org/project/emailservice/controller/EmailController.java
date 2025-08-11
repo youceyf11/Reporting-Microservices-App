@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.codec.multipart.FilePart;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
@@ -20,9 +20,11 @@ import org.project.emailservice.dto.EmailAttachment;
 import org.project.emailservice.service.EmailService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.core.io.buffer.DataBufferUtils;
 
-
-
+/**
+ * Controller for email-related operations.
+ */
 @RestController
 @RequestMapping("/api/emails")
 @Slf4j
@@ -52,38 +54,45 @@ public class EmailController {
      *   <li><strong>file</strong> : image du graphique à joindre.</li>
      * </ul>
      * @param meta métadonnées de l’e-mail (partie « request »)
-     * @param file fichier image du graphique (partie « file »)
+     * @param filePart fichier image du graphique (partie « file »)
      * @return <code>Mono</code> émettant une réponse HTTP 202 avec {@link org.project.emailservice.dto.EmailResponse}
      */
     @PostMapping(value = "/send/chart", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Mono<ResponseEntity<EmailResponse>> sendChartEmail(
             @RequestPart("request") @Valid EmailRequest meta,
-            @RequestPart("file") MultipartFile file) {
+            @RequestPart("file") FilePart filePart) {
 
-        byte[] chartData;
-        try {
-            chartData = file.getBytes();
-        } catch (Exception e) {
-            return Mono.error(e);
-        }
+        return Mono.defer(() ->
+                // Join the incoming DataBuffer stream into a single DataBuffer and extract bytes
+                DataBufferUtils.join(filePart.content())
+                        .map(dataBuffer -> {
+                            byte[] bytes = new byte[dataBuffer.readableByteCount()];
+                            dataBuffer.read(bytes);
+                            DataBufferUtils.release(dataBuffer);
+                            return bytes;
+                        })
+                        .flatMap(chartData -> {
+                            EmailRequest request = meta.toBuilder()
+                                    .subject(meta.getSubject() != null ? meta.getSubject()
+                                            : "Chart Report - " + meta.getTemplateData().getOrDefault("projectKey", ""))
+                                    .templateName("chart-email")
+                                    .attachments(List.of(
+                                            EmailAttachment.builder()
+                                                    .filename(meta.getTemplateData() != null
+                                                            ? meta.getTemplateData().getOrDefault("chartType", "chart") + "-" +
+                                                              meta.getTemplateData().getOrDefault("projectKey", "proj") + ".png"
+                                                            : filePart.filename())
+                                                    .content(chartData)
+                                                    .contentType(filePart.headers().getContentType() != null
+                                                            ? filePart.headers().getContentType().toString()
+                                                            : "image/png")
+                                                    .build()))
+                                    .build();
 
-        EmailRequest request = meta.toBuilder()
-                .subject(meta.getSubject() != null ? meta.getSubject()
-                        : "Chart Report - " + meta.getTemplateData().getOrDefault("projectKey", ""))
-                .templateName("chart-email")
-                .attachments(List.of(
-                        EmailAttachment.builder()
-                                .filename(meta.getTemplateData() != null
-                                        ? meta.getTemplateData().getOrDefault("chartType", "chart") + "-" +
-                                          meta.getTemplateData().getOrDefault("projectKey", "proj") + ".png"
-                                        : file.getOriginalFilename())
-                                .content(chartData)
-                                .contentType(file.getContentType() != null ? file.getContentType() : "image/png")
-                                .build()))
-                .build();
-
-        return emailService.processEmailRequest(request)
-                .map(response -> ResponseEntity.accepted().body(response));
+                            return emailService.processEmailRequest(request);
+                        })
+                        .map(response -> ResponseEntity.accepted().body(response))
+        );
     }
     
     @GetMapping("/status/{emailId}")
