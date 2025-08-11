@@ -13,10 +13,21 @@ public class ReportingResultDto {
     @JsonProperty("employeeRankings")
     private List<EmployeePerformanceDto> employees;
 
+    private String month;
+    private String year;
+    private String projectKey;
+
     public ReportingResultDto() {}
 
+    // Convenience constructor for only employee list (kept for backward compatibility)
     public ReportingResultDto(List<EmployeePerformanceDto> employees) {
         this.employees = employees;
     }
 
+    public ReportingResultDto(String month, String year, String projectKey, List<EmployeePerformanceDto> employeeRankings) {
+        this.month = month;
+        this.year = year;
+        this.projectKey = projectKey;
+        this.employees = employeeRankings;
+    }
 }

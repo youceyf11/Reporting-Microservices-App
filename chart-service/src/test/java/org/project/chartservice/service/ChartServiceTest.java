@@ -1,13 +1,9 @@
-package org.project.chartservice;
+package org.project.chartservice.service;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.project.chartservice.dto.EmployeePerformanceDto;
 import org.project.chartservice.enums.ChartType;
-import org.project.chartservice.service.ChartGenerationService;
-import org.project.chartservice.service.ChartService;
-import org.project.chartservice.service.EmailService;
-import org.project.chartservice.service.ReportingService;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import java.io.IOException;
