@@ -4,6 +4,8 @@ import org.project.jirafetchservice.client.JiraWebClient;
 import org.project.jirafetchservice.dto.IssueSimpleDto;
 import org.project.jirafetchservice.entity.JiraIssueDbEntity;
 import org.project.jirafetchservice.jiraApi.JiraIssueApiResponse;
+import org.project.issueevents.events.IssueUpsertedEvent;
+import org.project.jirafetchservice.kafka.JiraIssueEventProducer;
 import org.project.jirafetchservice.mapper.JiraMapper;
 import org.project.jirafetchservice.repository.JiraIssueRepository;
 import org.springframework.stereotype.Service;
@@ -11,6 +13,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -20,14 +23,17 @@ public class JiraIssueService {
     private final JiraWebClient jiraWebClient;
     private final JiraIssueRepository jiraIssueRepository;
     private final JiraMapper jiraMapper;
+    private final JiraIssueEventProducer eventProducer;
 
     
     public JiraIssueService(JiraWebClient jiraWebClient,
                             JiraIssueRepository jiraIssueRepository,
-                            JiraMapper jiraMapper) {
+                            JiraMapper jiraMapper,
+                            JiraIssueEventProducer eventProducer) {
         this.jiraWebClient = jiraWebClient;
         this.jiraIssueRepository = jiraIssueRepository;
         this.jiraMapper = jiraMapper;
+        this.eventProducer = eventProducer;
     }
 
     // ================== MÉTHODES DE CONSULTATION (API uniquement) ==================
@@ -104,7 +110,8 @@ public class JiraIssueService {
                 .flatMap(issueDto -> {
                     JiraIssueDbEntity entity = jiraMapper.toDbEntityFromSimpleDto(issueDto);
                     return jiraIssueRepository.save(entity)
-                            .map(savedEntity -> issueDto);
+                            .map(savedEntity -> issueDto)
+                            .flatMap(dto -> publishIssueEvent(dto).thenReturn(dto)); // Publish event after save
                 })
                 .doOnError(error -> System.err.println("Erreur lors de la synchronisation depuis Jira: " + error.getMessage()));
     }
@@ -144,12 +151,8 @@ public class JiraIssueService {
                                                             }));
                                         })
                                         .map(jiraMapper::toSimpleDtoFromDb)
-                                        .doOnNext(saved -> {
-                                            Integer count = processedCount.incrementAndGet();
-                                            if (count % 10 == 0) {
-                                                System.out.println("Traité " + count + " issues");
-                                            }
-                                        });
+                                        .flatMap(dto -> publishIssueEvent(dto).thenReturn(dto)) // Publish event after save
+                                        .doOnNext(dto -> processedCount.incrementAndGet());
                             })
                             .onErrorResume(error -> {
                                 System.err.println("Erreur lors du traitement du batch: " + error.getMessage());
@@ -172,7 +175,8 @@ public class JiraIssueService {
                 .flatMap(issueDto -> {
                     JiraIssueDbEntity entity = jiraMapper.toDbEntityFromSimpleDto(issueDto);
                     return jiraIssueRepository.save(entity)
-                            .map(savedEntity -> issueDto);
+                            .map(savedEntity -> issueDto)
+                            .flatMap(dto -> publishIssueEvent(dto).thenReturn(dto)); // Publish event after save
                 })
                 .doOnError(error -> System.err.println("Erreur lors de la synchronisation de recherche: " + error.getMessage()));
     }
@@ -234,5 +238,27 @@ public class JiraIssueService {
                 .next()
                 .map(jiraMapper::toSimpleDtoFromDb)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Issue non trouvée en base : " + issueKey)));
+    }
+
+    /**
+     * Publishes an IssueUpsertedEvent to Kafka after an issue is saved to the database
+     */
+    private Mono<Void> publishIssueEvent(IssueSimpleDto issueDto) {
+        try {
+            IssueUpsertedEvent event = new IssueUpsertedEvent(
+          issueDto.getProjectKey(),       
+          issueDto.getIssueKey(),         
+          issueDto.getAssignee(),         
+          issueDto.getTimeSpentSeconds(),   
+          issueDto.getResolved() != null  
+            ? issueDto.getResolved().toInstant(ZoneOffset.UTC)
+            : null
+);              
+            return eventProducer.publish(event);
+        } catch (Exception e) {
+            // Log error but don't fail the main flow
+            System.err.println("Failed to publish event for issue: " + issueDto.getIssueKey() + " - " + e.getMessage());
+            return Mono.empty();
+        }
     }
 }

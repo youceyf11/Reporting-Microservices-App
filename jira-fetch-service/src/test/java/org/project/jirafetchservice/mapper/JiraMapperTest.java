@@ -79,6 +79,7 @@ class JiraMapperTest {
         // Then
         assertThat(result).isNotNull();
         assertThat(result.getIssueKey()).isEqualTo("PROJ-123");
+        assertThat(result.getProjectKey()).isEqualTo("PROJ");
         assertThat(result.getSummary()).isEqualTo("Test Summary");
         assertThat(result.getIssueType()).isEqualTo("Bug");
         assertThat(result.getStatus()).isEqualTo("Open");

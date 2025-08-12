@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public class JiraIssueDto {
     private String id;
     private String issueKey;
+    private String projectKey;
     private String self;
     private String summary;
     private String issueType;

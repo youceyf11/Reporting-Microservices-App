@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 @Builder
 public class IssueSimpleDto {
 
+    private String projectKey;
     private String issueKey;         // ex: JIRA-123
     private String summary;          // résumé du ticket
     private String issueType;        // Bug, Task, Story, etc.

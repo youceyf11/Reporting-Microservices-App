@@ -19,6 +19,7 @@ public interface JiraMapper {
 
     // API → DTO simple
     @Mapping(source = "key", target = "issueKey")
+    @Mapping(source = "key", target = "projectKey", qualifiedByName = "extractProjectKey")
     @Mapping(source = "fields.summary", target = "summary")
     @Mapping(source = "fields.issuetype.name", target = "issueType")
     @Mapping(source = "fields.status.name", target = "status")
@@ -74,6 +75,7 @@ public interface JiraMapper {
     // API → DTO complet
     @Mapping(source = "fields.summary", target = "summary")
     @Mapping(source = "key", target = "issueKey")
+    @Mapping(source = "key", target = "projectKey", qualifiedByName = "extractProjectKey")
     @Mapping(source = "fields.issuetype.name", target = "issueType")
     @Mapping(source = "fields.status.name", target = "status")
     @Mapping(source = "fields.priority.name", target = "priority")
@@ -112,9 +114,9 @@ public interface JiraMapper {
     @Mapping(source = "fields.reporter.displayName", target = "reporter")
     @Mapping(source = "fields.reporter.emailAddress", target = "reporterEmail")
     @Mapping(source = "fields.organization", target = "organization")
-    @Mapping(source = "fields.created", target = "created")
-    @Mapping(source = "fields.updated", target = "updated")
-    @Mapping(source = "fields.resolved", target = "resolved")
+    @Mapping(source = "fields.created", target = "created", qualifiedByName = "parseJiraDate")
+    @Mapping(source = "fields.updated", target = "updated", qualifiedByName = "parseJiraDate")
+    @Mapping(source = "fields.resolved", target = "resolved", qualifiedByName = "parseJiraDate")
     @Mapping(source = "fields.timeSpentSeconds", target = "timeSpentSeconds")
     @Mapping(source = "fields.classification", target = "classification")
     @Mapping(source = "fields.entity", target = "entity")
@@ -137,9 +139,9 @@ public interface JiraMapper {
     @Mapping(source = "issueKey", target = "issueKey")
     @Mapping(source = "issueKey", target = "projectKey", qualifiedByName = "extractProjectKey")
     @Mapping(target = "newEntity", ignore = true) // conserve la valeur par défaut true
-    @Mapping(source = "created", target = "created", qualifiedByName = "formatDateForDb")
-    @Mapping(source = "updated", target = "updated", qualifiedByName = "formatDateForDb")
-    @Mapping(source = "resolved", target = "resolved", qualifiedByName = "formatDateForDb")
+    @Mapping(source = "created", target = "created")
+    @Mapping(source = "updated", target = "updated")
+    @Mapping(source = "resolved", target = "resolved")
     @Mapping(source = "month", target = "issueMonth")
     @Mapping(target = "assigneeEmail", ignore = true)
     @Mapping(target = "reporterEmail", ignore = true)

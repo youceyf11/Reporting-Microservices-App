@@ -15,6 +15,7 @@ services:
       - SPRING_R2DBC_URL=${SPRING_R2DBC_URL}
       - SPRING_R2DBC_USERNAME=${SPRING_R2DBC_USERNAME}
       - SPRING_R2DBC_PASSWORD=${SPRING_R2DBC_PASSWORD}
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       - postgres
 
@@ -30,6 +31,7 @@ services:
       - REPORTING_SERVICE_PORT=${REPORTING_SERVICE_PORT}
       - JIRA_FETCH_BASE_URL=${JIRA_FETCH_BASE_URL}
       - SPRING_PROFILES_ACTIVE=testdata
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       - jira-fetch-service
 
@@ -42,6 +44,7 @@ services:
     env_file: .env
     environment:
       - REPORTING_SERVICE_URL=${REPORTING_SERVICE_URL}
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       - reporting-service
 
@@ -63,6 +66,7 @@ services:
       - SPRING_DATA_REDIS_PORT=6379
       - GMAIL_USERNAME=${GMAIL_USERNAME}
       - GMAIL_PASSWORD=${GMAIL_PASSWORD}
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
 
   excel-service:
     build:
@@ -76,6 +80,7 @@ services:
       - SPRING_R2DBC_PASSWORD=${SPRING_R2DBC_PASSWORD}
       - EXCEL_REPORTS_DIR=/data
       - EXCEL_CHECKPOINT_DIR=/data
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     env_file: .env 
     volumes:
       - /Users/youssefouriniche/Desktop/reportsExcel:/data
