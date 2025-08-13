@@ -71,8 +71,12 @@ public class ExcelFileWriter {
             // En-têtes dans l'ordre exact souhaité (conforme à la capture)
             String[] headers = {"Key","Summary","Issue Type","Status","Priority","Resolution","Assignee","Reporter","Created","Updated","Resolved","Time Spent (s)","Organization","Classification","Entity","Issue Quality","Medium","TTS Days","Site","Month","Quota/Project"};
 
-            // (Re)générer l'en-tête si la feuille est nouvelle OU si le nombre de colonnes ne correspond pas
-            if (isNewSheet || sheet.getRow(0).getLastCellNum() != headers.length) {
+            // Vérifier si la première ligne (header) existe et possède le bon nombre de colonnes
+            boolean headerMissingOrCorrupt = sheet.getRow(0) == null
+                    || sheet.getRow(0).getLastCellNum() != headers.length;
+
+            // (Re)générer l'en-tête si la feuille est nouvelle OU corrompue
+            if (isNewSheet || headerMissingOrCorrupt) {
                 Row header = sheet.createRow(0);
 
                 // Style: teal background + white bold text
@@ -128,19 +132,20 @@ public class ExcelFileWriter {
                 row.createCell(20).setCellValue(issue.getQuotaPerProject());
             }
 
-            // Sauvegarder
-            try (OutputStream out = Files.newOutputStream(file
-            ,StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
-            ){
+            // Autosize des colonnes avant l'écriture, tant que le classeur est ouvert
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            // Sauvegarder puis fermer le classeur
+            try (OutputStream out = Files.newOutputStream(
+                    file,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING)) {
                 workbook.write(out);
             }
 
             workbook.close();
-
-            // Autosize des colonnes (après écriture complète)
-            for (int i = 0; i < headers.length; i++) {
-                sheet.autoSizeColumn(i);
-            }
 
             log.info("Appended {} issues to {}", rows.size(), file.toAbsolutePath());
 

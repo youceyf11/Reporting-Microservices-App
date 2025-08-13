@@ -1,5 +1,7 @@
 package org.project.excelservice.repository;
 
+import java.time.LocalDateTime;
+
 import org.project.excelservice.entity.Issue;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.data.repository.query.Param;
@@ -16,6 +18,6 @@ public interface IssueRepository extends ReactiveCrudRepository<Issue, String> {
              AND updated > :updatedAfter
            """)
     Flux<Issue> findByProjectKeyAndUpdatedAfter(@Param("projectKey") String projectKey,
-                                                @Param("updatedAfter") String updatedAfter);
+                                                @Param("updatedAfter") LocalDateTime updatedAfter);
     
 }

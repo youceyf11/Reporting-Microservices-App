@@ -3,6 +3,7 @@ package org.project.excelservice.controller;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.project.excelservice.service.ExcelReportService;
 import org.project.excelservice.service.ExcelSyncService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
@@ -19,6 +20,9 @@ class ExcelControllerTest {
 
     @MockBean
     ExcelSyncService excelSyncService;
+
+    @MockBean
+    ExcelReportService excelReportService;
 
     @Test
     @DisplayName("GET /api/excel/{projectKey} returns 200 when sync succeeds")

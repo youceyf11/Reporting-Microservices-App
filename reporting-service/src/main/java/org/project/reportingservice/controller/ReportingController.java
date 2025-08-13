@@ -228,6 +228,28 @@ public class ReportingController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Get weekly statistics for all employees in a project.
+     * Mirrors ReportingService#getWeeklyStatistics so that Excel-Service can
+     * consume the endpoint `/api/reporting/weekly/stats?projectKey=XYZ`.
+     *
+     * @param projectKey Jira project key
+     * @return map: employeeEmail -> { weekNumber -> hoursWorked }
+     */
+    @GetMapping("/weekly/stats")
+    public Mono<ResponseEntity<Map<String, Map<Integer, Double>>>> getWeeklyStatistics(
+            @RequestParam String projectKey) {
+
+        // basic validation
+        if (projectKey == null || projectKey.trim().isEmpty()) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+
+        return reportingService.getWeeklyStatistics(projectKey)
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
     @GetMapping("/monthly/detailed/{projectKey}")
     public Mono<ResponseEntity<Map<String, Map<Integer, Double>>>> getDetailedMonthlyStatistics(@PathVariable String projectKey) {
         // Validate project key

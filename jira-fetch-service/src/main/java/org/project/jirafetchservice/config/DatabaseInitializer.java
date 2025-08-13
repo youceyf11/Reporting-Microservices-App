@@ -13,10 +13,11 @@ public class DatabaseInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        String dropTableSql = "DROP TABLE IF EXISTS jira_issue";
+        // Supprime la suppression systématique de la table pour conserver les données de test
+        // String dropTableSql = "DROP TABLE IF EXISTS jira_issue";
 
         String createTableSql = """
-            CREATE TABLE jira_issue (
+            CREATE TABLE IF NOT EXISTS jira_issue (
                 id VARCHAR(255) PRIMARY KEY,
                 issue_key VARCHAR(255) UNIQUE NOT NULL,
                 project_key VARCHAR(255) NOT NULL,
@@ -30,9 +31,9 @@ public class DatabaseInitializer implements CommandLineRunner {
                 assignee_email VARCHAR(255),
                 reporter VARCHAR(255),
                 reporter_email VARCHAR(255),
-                created VARCHAR(255),
-                updated VARCHAR(255),
-                resolved VARCHAR(255),
+                created TIMESTAMP,
+                updated TIMESTAMP,
+                resolved TIMESTAMP,
                 time_spent_seconds BIGINT,
                 organization VARCHAR(255),
                 classification VARCHAR(255),
@@ -48,11 +49,9 @@ public class DatabaseInitializer implements CommandLineRunner {
 
         try {
             r2dbcEntityTemplate.getDatabaseClient()
-                    .sql(dropTableSql)
+                    // .sql(dropTableSql).then()  // Désactivé : on ne supprime plus la table
+                    .sql(createTableSql)
                     .then()
-                    .then(r2dbcEntityTemplate.getDatabaseClient()
-                            .sql(createTableSql)
-                            .then())
                     .then(r2dbcEntityTemplate.getDatabaseClient()
                             .sql("CREATE INDEX IF NOT EXISTS idx_jira_issue_project_key ON jira_issue(project_key)")
                             .then())

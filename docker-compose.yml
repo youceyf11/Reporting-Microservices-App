@@ -31,7 +31,11 @@ services:
       - REPORTING_SERVICE_PORT=${REPORTING_SERVICE_PORT}
       - JIRA_FETCH_BASE_URL=${JIRA_FETCH_BASE_URL}
       - SPRING_PROFILES_ACTIVE=testdata
+      - SPRING_SQL_INIT_MODE=never
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_R2DBC_URL=${SPRING_R2DBC_URL}
+      - SPRING_R2DBC_USERNAME=${SPRING_R2DBC_USERNAME}
+      - SPRING_R2DBC_PASSWORD=${SPRING_R2DBC_PASSWORD}
     depends_on:
       - jira-fetch-service
 
@@ -111,7 +115,8 @@ services:
     ports:
       - "${POSTGRES_PORT}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./reporting-service/src/main/resources/data-test.sql:/docker-entrypoint-initdb.d/data-test.sql:ro
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
 
@@ -128,6 +133,22 @@ services:
       KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       ALLOW_PLAINTEXT_LISTENER: yes
+
+  db-seeder:
+    image: postgres:16
+    depends_on:
+      - postgres
+    env_file: .env
+    environment:
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ./reporting-service/src/main/resources/data-test.sql:/seed.sql:ro
+    entrypoint: [ "bash", "-lc", "
+      until pg_isready -h postgres -U ${POSTGRES_USER} >/dev/null 2>&1; do sleep 1; done;
+      echo 'Seeding test data...';
+      psql -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} -f /seed.sql
+     " ]
+    restart: "no"
 
 
 volumes:

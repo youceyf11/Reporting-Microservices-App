@@ -6,9 +6,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Table;
+import java.time.LocalDateTime;
 
-
-
+/**
+ * 
+ */
 @Table("jira_issue")
 @Data
 @Builder
@@ -28,9 +30,9 @@ public class Issue {
     private String assigneeEmail;
     private String reporter;
     private String reporterEmail;
-    private String created;
-    private String updated;
-    private String resolved;
+    private LocalDateTime created;
+    private LocalDateTime updated;
+    private LocalDateTime resolved;
     private Long timeSpentSeconds;
     private String organization;
     private String classification;

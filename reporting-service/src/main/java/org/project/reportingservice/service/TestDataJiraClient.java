@@ -7,7 +7,6 @@ import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -27,10 +26,12 @@ public class TestDataJiraClient implements IJiraClient {
 
     @Override
     public Flux<IssueSimpleDto> fetchProjectIssues(String projectKey, int limit) {
-        String sql = "SELECT * FROM jira_issue WHERE project_key = :pk LIMIT :lim";
+        // NOTE: PostgreSQL does not allow binding a LIMIT value as a parameter in prepared statements.
+        // Using a bind here makes the query return zero rows. We hard-code the limit instead.
+        String sql = "SELECT * FROM jira_issue WHERE project_key = :pk LIMIT 100";
         return dbClient.sql(sql)
                 .bind("pk", projectKey)
-                .bind("lim", limit)
+                // limit hard-coded in SQL
                 .map((row, meta) -> IssueSimpleDto.builder()
                         .issueKey(row.get("issue_key", String.class))
                         .summary(row.get("summary", String.class))
@@ -41,9 +42,9 @@ public class TestDataJiraClient implements IJiraClient {
                         .assignee(row.get("assignee", String.class))
                         .reporter(row.get("reporter", String.class))
                         .organization(row.get("organization", String.class))
-                        .created(parseDate(row.get("created", String.class)))
-                        .updated(parseDate(row.get("updated", String.class)))
-                        .resolved(parseDate(row.get("resolved", String.class)))
+                        .created(row.get("created", LocalDateTime.class))
+                        .updated(row.get("updated", LocalDateTime.class))
+                        .resolved(row.get("resolved", LocalDateTime.class))
                         .timeSpentSeconds(row.get("time_spent_seconds", Long.class))
                         .classification(row.get("classification", String.class))
                         .entity(row.get("entity", String.class))
@@ -63,15 +64,5 @@ public class TestDataJiraClient implements IJiraClient {
         return Flux.empty();
     }
 
-    private LocalDateTime parseDate(String dateStr) {
-        if (dateStr == null) return null;
-        try {
-            if (dateStr.length() == 10) { // yyyy-MM-dd
-                return LocalDate.parse(dateStr).atStartOfDay();
-            }
-            return LocalDateTime.parse(dateStr);
-        } catch (Exception e) {
-            return null;
-        }
-    }
+    // Timestamp columns are mapped directly; helper no longer used.
 }

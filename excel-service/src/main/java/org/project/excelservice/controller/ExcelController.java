@@ -1,13 +1,19 @@
 package org.project.excelservice.controller;
 
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
+
+import org.project.excelservice.service.ExcelReportService;
 import org.project.excelservice.service.ExcelSyncService;
 
 @RestController
@@ -17,8 +23,11 @@ public class ExcelController {
     
     private final ExcelSyncService excelSyncService;
 
-    public ExcelController(ExcelSyncService excelSyncService) {
+    private final ExcelReportService excelReportService;
+
+    public ExcelController(ExcelSyncService excelSyncService,ExcelReportService excelReportService ) {
         this.excelSyncService = excelSyncService;
+        this.excelReportService=excelReportService;
     }
 
     @GetMapping("/{projectKey}")
@@ -31,4 +40,18 @@ public class ExcelController {
                             .body("Failed to sync data for project: "+ projectKey));
                 });
     }
+
+
+     @GetMapping(value = "/performance", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public Mono<ResponseEntity<ByteArrayResource>> download(@RequestParam String projectKey) {
+        return Mono.fromSupplier(() -> excelReportService.generateEmployeeReport(projectKey))
+                .map(bytes -> ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_DISPOSITION,
+                                "attachment; filename=\"performance_" + projectKey + ".xlsx\"")
+                        .contentType(MediaType.parseMediaType(
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                        .body(bytes));
+    }
+
+
 }

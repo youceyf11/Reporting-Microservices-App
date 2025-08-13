@@ -10,6 +10,7 @@ import org.project.excelservice.repository.IssueRepository;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 class ExcelSyncServiceTest {
@@ -31,7 +32,7 @@ class ExcelSyncServiceTest {
     @DisplayName("sync() returns 'Nothing new' when no issues found")
     void sync_noIssues() {
         Mockito.when(checkpoint.getLastUpdated("PROJ")).thenReturn("1970-01-01T00:00:00Z");
-        Mockito.when(repository.findByProjectKeyAndUpdatedAfter("PROJ", "1970-01-01T00:00:00Z"))
+        Mockito.when(repository.findByProjectKeyAndUpdatedAfter("PROJ", LocalDateTime.of(1970, 1, 1, 0, 0)))
                .thenReturn(Flux.empty());
 
         StepVerifier.create(service.sync("PROJ"))
@@ -42,12 +43,12 @@ class ExcelSyncServiceTest {
     @Test
     @DisplayName("sync() appends issues, updates checkpoint and returns success message")
     void sync_happyPath() {
-        Issue i1 = Issue.builder().issueKey("PROJ-1").updated("2025-01-01T00:00:01Z").build();
-        Issue i2 = Issue.builder().issueKey("PROJ-2").updated("2025-01-02T00:00:00Z").build();
+        Issue i1 = Issue.builder().issueKey("PROJ-1").updated(LocalDateTime.parse("2025-01-01T00:00:01")).build();
+        Issue i2 = Issue.builder().issueKey("PROJ-2").updated(LocalDateTime.parse("2025-01-02T00:00:00")).build();
         List<Issue> list = List.of(i1, i2);
 
         Mockito.when(checkpoint.getLastUpdated("PROJ")).thenReturn("1970-01-01T00:00:00Z");
-        Mockito.when(repository.findByProjectKeyAndUpdatedAfter("PROJ", "1970-01-01T00:00:00Z"))
+        Mockito.when(repository.findByProjectKeyAndUpdatedAfter("PROJ", LocalDateTime.of(1970, 1, 1, 0, 0)))
                .thenReturn(Flux.fromIterable(list));
 
         StepVerifier.create(service.sync("PROJ"))
