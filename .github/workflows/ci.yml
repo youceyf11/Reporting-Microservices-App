@@ -3,21 +3,38 @@ name: CI
 on:
   push:
     branches: ["**"]
+    tags: ["*"]
   pull_request:
     branches: ["**"]
+
+permissions:
+  contents: read
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
 
     services:
+      zookeeper:
+        image: bitnami/zookeeper:3
+        ports:
+          - 2181:2181
+        options: >-
+          --health-cmd="echo ruok | nc -w 2 127.0.0.1 2181 | grep imok"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+
       kafka:
         image: bitnami/kafka:3
         ports:
           - 9092:9092
         env:
-           KAFKA_BROKER_ID: 1
-           KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+          KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+          KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+          ALLOW_PLAINTEXT_LISTENER: "yes"
+        options: >-
+          --health-cmd="kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+
       redis:
         image: redis:7-alpine
         ports:
@@ -27,6 +44,7 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=12
+
       rabbitmq:
         image: rabbitmq:3-management
         env:
@@ -41,6 +59,18 @@ jobs:
           --health-timeout=5s
           --health-retries=12
 
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: jira_db
+          POSTGRES_USER: jira
+          POSTGRES_PASSWORD: secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U jira -d jira_db"
+          --health-interval=10s --health-timeout=5s --health-retries=20
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -52,9 +82,75 @@ jobs:
           java-version: "17"
           cache: maven
 
-      - name: Build and test
-        run: mvn -B clean test
+      - name: Wait for services
+        run: |
+          for i in {1..60}; do
+            nc -z localhost 2181 \
+            && nc -z localhost 9092 \
+            && nc -z localhost 6379 \
+            && nc -z localhost 5672 \
+            && nc -z localhost 5432 \
+            && break
+            echo "waiting for zookeeper/kafka/redis/rabbitmq/postgres... ($i)"
+            sleep 2
+          done
 
-      - name: Package application (optional)
-        if: success()
-        run: mvn -B package -DskipTests
+      - name: Build + unit/integration tests
+        run: mvn -B -Dspring.profiles.active=ci verify
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-and-jacoco
+          path: |
+            **/target/surefire-reports/*.xml
+            **/target/failsafe-reports/*.xml
+            **/target/site/jacoco/*.xml
+
+  docker-images:
+    needs: build-test
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build & push multi-module images
+        run: |
+          TAG=${GITHUB_SHA::7}
+          for svc in jira-fetch-service reporting-service chart-service email-service excel-service gateway-service discovery-service; do
+            docker build \
+              -t ghcr.io/${{ github.repository_owner }}/${svc}:${TAG} \
+              -t ghcr.io/${{ github.repository_owner }}/${svc}:${GITHUB_SHA} \
+              -t ghcr.io/${{ github.repository_owner }}/${svc}:latest \
+              ./${svc}
+            docker push ghcr.io/${{ github.repository_owner }}/${svc}:${TAG}
+            docker push ghcr.io/${{ github.repository_owner }}/${svc}:${GITHUB_SHA}
+            docker push ghcr.io/${{ github.repository_owner }}/${svc}:latest
+          done
+
+  trivy-scan:
+    name: Trivy scan (matrix)
+    needs: docker-images
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        svc: [jira-fetch-service, reporting-service, chart-service, email-service, excel-service, gateway-service, discovery-service]
+    steps:
+      - name: Trivy scan ${{ matrix.svc }}
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/${{ matrix.svc }}:${{ github.sha }}
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          exit-code: '1'
