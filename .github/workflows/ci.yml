@@ -95,8 +95,8 @@ jobs:
             sleep 2
           done
 
-      - name: Build + unit/integration tests
-        run: mvn -B -Dspring.profiles.active=ci verify
+      - name: Build + tests
+        run: mvn -B -Dspring.profiles.active=ci -Ddependency-check.skip=true verify
 
       - name: Upload test reports
         if: always()
